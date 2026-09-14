@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { DEFAULT_THEME, normalizeThemeId, isStoreTheme } from "../config/themes";
+import { DEFAULT_THEME, normalizeThemeId } from "../config/themes";
 import type { Locale } from "../types";
 import { isTauriRuntime } from "../lib/tauriRuntime";
-import { fetchAndCacheStoreTheme, injectStoreThemeCSS } from "../../features/theme-store/hooks/useThemeApply";
+import { clearRetiredBrowserData } from "../lib/retiredStorage";
 
 interface UseSettingsInitOptions {
   setAppSettings: (settings: Record<string, string>) => void;
@@ -29,40 +29,25 @@ export const useSettingsInit = ({
   useEffect(() => {
     if (!isTauriRuntime()) return;
 
+    try {
+      clearRetiredBrowserData(localStorage);
+    } catch {
+      // Settings still load from SQLite if browser storage is unavailable.
+    }
+
     let disposed = false;
 
     const loadSettings = () => {
-      settingsEffectCount.current++;
-      console.log(`[THEME DEBUG] Settings useEffect run #${settingsEffectCount.current}`);
-
+      const request = ++settingsEffectCount.current;
       invoke<Record<string, string>>("get_settings")
         .then((result) => {
-          if (disposed) return;
-
-          console.log(
-            `[THEME DEBUG] get_settings response (run #${settingsEffectCount.current}):`,
-            result
-          );
-          console.log("[THEME DEBUG] app.color_mode from DB:", result["app.color_mode"]);
+          if (disposed || request !== settingsEffectCount.current) return;
 
           setAppSettings(result);
           if (result["app.hotkey"]) setHotkey(result["app.hotkey"]);
 
           const loadedTheme = normalizeThemeId(result["app.theme"] || DEFAULT_THEME);
           const loadedColorMode = result["app.color_mode"] || "system";
-          console.log("[THEME DEBUG] loadedColorMode:", loadedColorMode);
-
-          // If store theme, inject cached CSS before applying class
-          if (isStoreTheme(loadedTheme)) {
-            const cached = localStorage.getItem(`tiez_store_css_${loadedTheme}`);
-            if (cached) {
-              injectStoreThemeCSS(loadedTheme, cached);
-            }
-            // Re-fetch in background to update cache
-            fetchAndCacheStoreTheme(loadedTheme).then((css) => {
-              if (css) injectStoreThemeCSS(loadedTheme, css);
-            }).catch(() => {});
-          }
 
           setTheme(loadedTheme);
           setColorMode(loadedColorMode);

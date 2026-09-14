@@ -97,14 +97,8 @@ pub fn set_deduplication(
         .set("app.deduplicate", &enabled.to_string());
 }
 
-#[tauri::command]
-pub fn save_setting(
-    db_state: State<'_, DbState>,
-    settings_state: State<'_, crate::app_state::SettingsState>,
-    key: String,
-    mut value: String,
-) -> AppResult<()> {
-    match key.as_str() {
+fn apply_runtime_setting(settings_state: &SettingsState, key: &str, mut value: String) -> String {
+    match key {
         "app.arrow_key_selection" => {
             settings_state
                 .arrow_key_selection
@@ -119,11 +113,6 @@ pub fn save_setting(
             settings_state
                 .sound_enabled
                 .store(value == "true", Ordering::Relaxed);
-        }
-        "app.sound_paste_enabled" => {
-            settings_state
-                .delete_after_paste
-                .store(value != "false", Ordering::Relaxed);
         }
         "app.persistent" => {
             settings_state
@@ -179,6 +168,18 @@ pub fn save_setting(
         _ => {}
     }
 
+    value
+}
+
+#[tauri::command]
+pub fn save_setting(
+    db_state: State<'_, DbState>,
+    settings_state: State<'_, crate::app_state::SettingsState>,
+    key: String,
+    value: String,
+) -> AppResult<()> {
+    let value = apply_runtime_setting(&settings_state, &key, value);
+
     db_state
         .settings_repo
         .set(&key, &value)
@@ -227,29 +228,6 @@ pub fn get_settings(
 }
 
 #[tauri::command]
-pub fn set_file_server_auto_close(
-    state: State<'_, crate::app_state::SettingsState>,
-    db_state: State<'_, DbState>,
-    enabled: bool,
-) -> AppResult<()> {
-    state
-        .file_server_auto_close
-        .store(enabled, Ordering::Relaxed);
-    db_state
-        .settings_repo
-        .set("file_transfer_auto_close", &enabled.to_string())
-        .map_err(AppError::from)
-}
-
-#[tauri::command]
-pub fn set_file_transfer_auto_open(db_state: State<'_, DbState>, enabled: bool) -> AppResult<()> {
-    db_state
-        .settings_repo
-        .set("file_transfer_auto_open", &enabled.to_string())
-        .map_err(AppError::from)
-}
-
-#[tauri::command]
 pub fn set_arrow_key_selection(
     state: State<'_, crate::app_state::SettingsState>,
     enabled: bool,
@@ -294,22 +272,6 @@ pub fn set_capture_rich_text(
     db_state
         .settings_repo
         .set("app.capture_rich_text", &enabled.to_string())
-        .map_err(AppError::from)
-}
-
-#[tauri::command]
-pub fn set_auto_copy_file(
-    state: State<'_, crate::app_state::SettingsState>,
-    db_state: State<'_, DbState>,
-    enabled: bool,
-) -> AppResult<()> {
-    state.auto_copy_file.store(enabled, Ordering::Relaxed);
-    db_state
-        .settings_repo
-        .set(
-            "file_transfer_auto_copy",
-            if enabled { "true" } else { "false" },
-        )
         .map_err(AppError::from)
 }
 
@@ -428,43 +390,6 @@ pub fn set_sound_enabled(
 }
 
 #[tauri::command]
-pub fn get_mqtt_status() -> bool {
-    crate::services::mqtt_sub::get_mqtt_status()
-}
-
-#[tauri::command]
-pub fn get_mqtt_running() -> bool {
-    crate::services::mqtt_sub::get_mqtt_running()
-}
-
-#[tauri::command]
-pub fn restart_mqtt_client(app_handle: AppHandle) {
-    crate::services::mqtt_sub::restart_mqtt_client(app_handle)
-}
-
-#[tauri::command]
-pub fn get_cloud_sync_status() -> crate::services::cloud_sync::CloudSyncStatus {
-    crate::services::cloud_sync::get_cloud_sync_status()
-}
-
-#[tauri::command]
-pub fn restart_cloud_sync_client(app_handle: AppHandle) {
-    crate::services::cloud_sync::restart_cloud_sync_client(app_handle);
-}
-
-#[tauri::command]
-pub fn request_cloud_sync(app_handle: AppHandle) {
-    crate::services::cloud_sync::request_cloud_sync(app_handle);
-}
-
-#[tauri::command]
-pub async fn cloud_sync_now(
-    app_handle: AppHandle,
-) -> AppResult<crate::services::cloud_sync::CloudSyncStatus> {
-    crate::services::cloud_sync::cloud_sync_now(app_handle).await
-}
-
-#[tauri::command]
 pub fn reset_settings(
     app: AppHandle,
     state: State<'_, DbState>,
@@ -477,13 +402,6 @@ pub fn reset_settings(
         let conn = state.conn.lock().unwrap();
         seed_defaults(&conn).map_err(AppError::from)?;
     }
-
-    let machine_id = crate::app::system::get_machine_id();
-    let new_id = format!("{}-0000-0000-0000-000000000000", machine_id);
-    state
-        .settings_repo
-        .set("app.anon_id", &new_id)
-        .map_err(AppError::from)?;
 
     let main_hotkey = state
         .settings_repo
@@ -591,4 +509,31 @@ pub fn set_follow_mouse(
         .settings_repo
         .set("app.follow_mouse", &enabled.to_string())
         .map_err(AppError::from)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn paste_sound_setting_does_not_change_delete_after_paste() {
+        for delete_after_paste in [false, true] {
+            let state = SettingsState::default();
+            state.delete_after_paste.store(delete_after_paste, Ordering::Relaxed);
+            for sound_enabled in ["true", "false"] {
+                let value = apply_runtime_setting(&state, "app.sound_paste_enabled", sound_enabled.to_string());
+                assert_eq!(value, sound_enabled);
+                assert_eq!(state.delete_after_paste.load(Ordering::Relaxed), delete_after_paste);
+            }
+        }
+    }
+
+    #[test]
+    fn delete_after_paste_setting_updates_runtime_state() {
+        let state = SettingsState::default();
+        for enabled in ["true", "false"] {
+            apply_runtime_setting(&state, "app.delete_after_paste", enabled.to_string());
+            assert_eq!(state.delete_after_paste.load(Ordering::Relaxed), enabled == "true");
+        }
+    }
 }

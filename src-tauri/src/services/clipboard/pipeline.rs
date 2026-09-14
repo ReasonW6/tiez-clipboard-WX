@@ -474,7 +474,7 @@ impl PipelineStage for PersistenceStage {
             let data_dir = app_data_dir.0.lock().unwrap().clone();
             let conn = db_state.conn.lock().unwrap();
 
-            if let Ok(id) = db_state.repo.save_with_conn(&conn, entry, Some(&data_dir)) {
+            if let Ok(id) = db_state.repo.save_capture_with_conn(&conn, entry, Some(&data_dir)) {
                 entry.id = id;
                 if let Ok(deleted_ids) = db_state
                     .repo
@@ -484,6 +484,8 @@ impl PipelineStage for PersistenceStage {
                         let _ = ctx.app_handle.emit("clipboard-removed", rid);
                     }
                 }
+            } else {
+                ctx.should_stop = true;
             }
         } else {
             // Session-only items
@@ -493,28 +495,9 @@ impl PipelineStage for PersistenceStage {
                 {
                     let mut session = session_history.0.lock().unwrap();
                     if let Some(existing) = session.iter_mut().find(|i| i.id == reuse_id) {
-                        let preserved_tags = existing.tags.clone();
-                        let preserved_pinned = existing.is_pinned;
-                        let preserved_pinned_order = existing.pinned_order;
-                        let preserved_use_count = existing.use_count;
-
-                        existing.content_type = entry.content_type.clone();
-                        existing.content = entry.content.clone();
-                        existing.html_content = entry.html_content.clone();
-                        existing.source_app = entry.source_app.clone();
-                        existing.source_app_path = entry.source_app_path.clone();
-                        existing.timestamp = entry.timestamp;
-                        existing.preview = entry.preview.clone();
-                        existing.is_external = entry.is_external;
-                        existing.file_preview_exists = entry.file_preview_exists;
-                        existing.is_pinned = preserved_pinned;
-                        existing.pinned_order = preserved_pinned_order;
-                        existing.tags = if entry.tags.is_empty() {
-                            preserved_tags
-                        } else {
-                            entry.tags.clone()
-                        };
-                        existing.use_count = preserved_use_count + 1;
+                        entry.preserve_capture_metadata(existing);
+                        entry.use_count = existing.use_count + 1;
+                        *existing = entry.clone();
 
                         updated_entry = Some(existing.clone());
                     }
@@ -596,8 +579,5 @@ impl PipelineStage for DistributionStage {
             .app_handle
             .emit("clipboard-updated", truncate_entry_for_ui(entry.clone()));
 
-        if settings.persistent.load(Ordering::Relaxed) && entry.id > 0 {
-            crate::services::cloud_sync::request_cloud_sync(ctx.app_handle.clone());
-        }
     }
 }

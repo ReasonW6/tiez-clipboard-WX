@@ -341,7 +341,7 @@ const SettingsFooter = ({
                     flexWrap: 'wrap'
                 }}>
                     <button
-                        onClick={() => openUrl('https://tiez.name666.top/')}
+                        onClick={() => openUrl('https://github.com/ReasonW6/tiez-clipboard-WX/releases')}
                         style={{
                             fontSize: '11px',
                             color: 'var(--accent-color)',
@@ -359,7 +359,7 @@ const SettingsFooter = ({
                         {t('official_website')}
                     </button>
                     <button
-                        onClick={() => openUrl('https://github.com/jimuzhe/tiez-clipboard')}
+                        onClick={() => openUrl('https://github.com/ReasonW6/tiez-clipboard-WX')}
                         style={{
                             fontSize: '11px',
                             color: 'var(--accent-color)',

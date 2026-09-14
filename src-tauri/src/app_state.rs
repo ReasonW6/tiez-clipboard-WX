@@ -4,14 +4,13 @@ use std::collections::VecDeque;
 use std::sync::atomic::AtomicBool;
 use std::sync::Mutex;
 
+#[cfg_attr(test, derive(Default))]
 pub struct SettingsState {
     pub deduplicate: AtomicBool,
     pub persistent: AtomicBool,
-    pub file_server_auto_close: AtomicBool,
     pub theme: Mutex<String>,
     pub capture_files: AtomicBool,
     pub capture_rich_text: AtomicBool,
-    pub auto_copy_file: AtomicBool,
     pub silent_start: AtomicBool,
     pub delete_after_paste: AtomicBool,
     pub privacy_protection: AtomicBool,

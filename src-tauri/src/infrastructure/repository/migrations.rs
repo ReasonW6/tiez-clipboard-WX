@@ -207,6 +207,29 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
         conn.execute("INSERT INTO schema_migrations (version) VALUES (10)", [])?;
     }
 
+
+    // Migration 11: Remove retired network/AI settings and synchronization metadata.
+    // Clipboard history, tags, and managed/user attachments are preserved.
+    if current_version < 11 {
+        let tx = conn.unchecked_transaction()?;
+        tx.execute_batch(
+            "
+            DROP TABLE IF EXISTS cloud_sync_tombstones;
+            DROP TABLE IF EXISTS cloud_sync_local_index;
+            DELETE FROM settings
+            WHERE key GLOB 'ai_*'
+               OR key GLOB 'mqtt_*'
+               OR key GLOB 'cloud_sync_*'
+               OR key GLOB 'file_server_*'
+               OR key GLOB 'file_transfer_*'
+               OR key IN ('app.anon_id', 'app.last_ping_date');
+            UPDATE settings SET value = 'mica' WHERE key = 'app.theme' AND value GLOB 'store-*';
+            ",
+        )?;
+        tx.execute("INSERT INTO schema_migrations (version) VALUES (11)", [])?;
+        tx.commit()?;
+    }
+
     Ok(())
 }
 
@@ -220,4 +243,70 @@ fn has_column(conn: &Connection, table_name: &str, column_name: &str) -> Result<
         }
     }
     Ok(false)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn assert_retired_data_removed(conn: &Connection) {
+        let tables: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('cloud_sync_tombstones', 'cloud_sync_local_index')",
+            [], |row| row.get(0),
+        ).unwrap();
+        assert_eq!(tables, 0);
+        let settings: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM settings WHERE key GLOB 'ai_*' OR key GLOB 'mqtt_*' OR key GLOB 'cloud_sync_*' OR key GLOB 'file_server_*' OR key GLOB 'file_transfer_*'",
+            [], |row| row.get(0),
+        ).unwrap();
+        assert_eq!(settings, 0);
+    }
+
+    #[test]
+    fn fresh_database_contains_only_local_settings() {
+        let conn = Connection::open_in_memory().unwrap();
+        run_migrations(&conn).unwrap();
+        crate::database::seed_defaults(&conn).unwrap();
+        assert_retired_data_removed(&conn);
+        assert!(has_column(&conn, "clipboard_history", "source_app_path").unwrap());
+    }
+
+    #[test]
+    fn upgrade_removes_retired_settings_and_preserves_history_and_tags() {
+        let conn = Connection::open_in_memory().unwrap();
+        run_migrations(&conn).unwrap();
+        conn.execute_batch(
+            "DELETE FROM schema_migrations WHERE version = 11;
+             CREATE TABLE cloud_sync_tombstones (content_type TEXT, content_hash INTEGER, deleted_at INTEGER);
+             CREATE TABLE cloud_sync_local_index (sync_key TEXT, digest TEXT);
+             INSERT INTO settings (key, value) VALUES
+                 ('ai_profiles', 'obsolete test profile'),
+                 ('mqtt_password', 'obsolete test credential'),
+                 ('cloud_sync_webdav_password', 'obsolete test credential'),
+                 ('file_server_enabled', 'true'),
+                 ('file_transfer_path', 'D:/Downloads'),
+                 ('app.theme', 'paper'),
+                 ('app.sound_paste_enabled', 'false');
+             INSERT INTO clipboard_history (id, content_type, content, source_app, timestamp, preview, is_pinned, tags)
+                 VALUES (42, 'text', 'Keep this local note', 'Editor', 123, 'Keep this local note', 1, '[\"work\"]');
+             INSERT INTO saved_tags (name) VALUES ('work');
+             INSERT INTO entry_tags (entry_id, tag) VALUES (42, 'work');",
+        ).unwrap();
+
+        run_migrations(&conn).unwrap();
+        run_migrations(&conn).unwrap();
+        crate::database::seed_defaults(&conn).unwrap();
+        assert_retired_data_removed(&conn);
+        let note: (String, bool) = conn.query_row(
+            "SELECT content, is_pinned FROM clipboard_history WHERE id = 42",
+            [], |row| Ok((row.get(0)?, row.get(1)?)),
+        ).unwrap();
+        assert_eq!(note, ("Keep this local note".to_string(), true));
+        let tag: String = conn.query_row("SELECT tag FROM entry_tags WHERE entry_id = 42", [], |row| row.get(0)).unwrap();
+        assert_eq!(tag, "work");
+        let theme: String = conn.query_row("SELECT value FROM settings WHERE key = 'app.theme'", [], |row| row.get(0)).unwrap();
+        assert_eq!(theme, "paper");
+        let sound: String = conn.query_row("SELECT value FROM settings WHERE key = 'app.sound_paste_enabled'", [], |row| row.get(0)).unwrap();
+        assert_eq!(sound, "false");
+    }
 }

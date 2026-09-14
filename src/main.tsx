@@ -6,6 +6,9 @@ import AdvancedSettingsWindow from "./features/settings/components/AdvancedSetti
 import "./index.css";
 import "./styles/components/index.css";
 import "./styles/themes/load";
+import { initializeAppearance } from "./shared/lib/appearance";
+
+initializeAppearance();
 
 const params = new URLSearchParams(window.location.search);
 const isCompactPreview = params.get("window") === "compact-preview";

@@ -1,4 +1,3 @@
-pub mod ai_cmd;
 pub mod clipboard_cmd;
 pub mod file_cmd;
 pub mod history_cmd;
@@ -10,7 +9,6 @@ pub mod ui_cmd;
 
 // Re-export all commands for convenience in main.rs if needed,
 // though tauri usually expects them to be referenced via module path in generate_handler!
-pub use ai_cmd::*;
 pub use clipboard_cmd::*;
 pub use file_cmd::*;
 pub use history_cmd::*;

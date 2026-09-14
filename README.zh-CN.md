@@ -1,130 +1,50 @@
-<p align="left">
-  <img src="docs/images/logo.png" width="32" vertical-align="middle" />
-  <b>让碎片化信息轻松流转的剪贴板工具</b>
-</p>
+# TieZ Clipboard WX
 
----
+基于 [jimuzhe/tiez-clipboard](https://github.com/jimuzhe/tiez-clipboard) 的 Windows 自用剪贴板工具。
 
-<div align="center">
-  <img src="docs/images/logo.png" alt="TieZ Hero Logo" width="300" />
+保留剪贴板历史、文本和富文本、图片、文件路径、搜索、标签、置顶、顺序粘贴、外部编辑、隐私脱敏、表情收藏以及七款内置主题。已移除 AI、云同步、MQTT、局域网传输、主题商店和公告。
 
-  ### **STAY FAST. STAY SYNCED.**
+自动更新使用 [ReasonW6/tiez-clipboard-WX 的发行版](https://github.com/ReasonW6/tiez-clipboard-WX/releases)，并校验更新签名。
 
-  | STARS | VERSION | LICENSE | PLATFORM |
-  | :--- | :--- | :--- | :--- |
-  | [![Stars](https://img.shields.io/github/stars/jimuzhe/tiez-clipboard?label=STARS&style=for-the-badge&color=4CAF50)](https://github.com/jimuzhe/tiez-clipboard/stargazers) | [![Version](https://img.shields.io/github/v/release/jimuzhe/tiez-clipboard?label=VERSION&style=for-the-badge&color=2196F3)](https://github.com/jimuzhe/tiez-clipboard/releases) | [![License](https://img.shields.io/badge/LICENSE-GPL--3.0-FF9800?style=for-the-badge)](https://www.gnu.org/licenses/gpl-3.0) | [![Platform](https://img.shields.io/badge/PLATFORM-WIN%20%2F%20MAC-f44336?style=for-the-badge)](https://github.com/jimuzhe/tiez-clipboard/releases) |
+## 开发
 
-  [English](./README.md) | [简体中文](./README.zh-CN.md)
-</div>
+需要 Windows 10/11 x64、Node.js 22.12+ 或 24、Rust MSVC 稳定版、Visual Studio C++ 生成工具和 WebView2。
 
----
+    npm ci
+    npm run tauri:dev
 
-<div align="center">
+dev 脚本仅启动前端，端口为 1420；剪贴板和系统交互需要完整 Tauri 应用。
 
-## 主题展示 (Theme Gallery)
+## 验证与打包
 
-探索为各种工作场景和效率场景精心设计的 4 款优雅主题样式。
+    npm test
+    npm run build
+    npm run test:rust
+    npm run tauri:build
+    npm run build:portable
 
-  <table>
-    <tr>
-      <td align="center"><b>极简毛玻璃</b><br><img src="docs/images/毛玻璃.png" width="220" /></td>
-      <td align="center"><b>笔记本风格</b><br><img src="docs/images/书.png" width="220" /></td>
-      <td align="center"><b>便利贴风格</b><br><img src="docs/images/便利贴.png" width="220" /></td>
-      <td align="center"><b>3D 动感</b><br><img src="docs/images/3d.png" width="220" /></td>
-    </tr>
-  </table>
-</div>
+默认生成 NSIS 安装包，不要求更新签名私钥。release 脚本生成带更新签名的安装包，具体步骤见[发行说明](docs/RELEASING.md)。
 
----
+便携包输出到 artifacts/portable/tiez-portable.zip，解压后运行 TieZ.exe，数据保存在相邻的 data 目录。敏感剪贴板内容仍由当前 Windows 账户保护。自动更新使用安装版；如需继续使用便携目录，请手动替换新版可执行文件并保留 data。
 
-## 为什么选择 TieZ?
+## 开发入口
 
-| 极速性能 | 深度工作流 | 本地隐私 | 云端流畅 |
-| :--- | :--- | :--- | :--- |
-| **瞬间响应**<br>Rust 核心层与原生监听器，只为追求毫秒级响应。 | **全能管理**<br>支持富文本、多色标签及高效的 AI 协作。 | **本地安全**<br>数据完全本地化存储，支持对各类敏感信息的预览自动脱敏。 | **多端无感同步**<br>基于 WebDAV 和 MQTT 协议，让剪贴板在设备间流动。 |
+- src/features：界面及功能状态。
+- src/shared/hooks：历史、设置、键盘导航、剪贴板事件和更新。
+- src/shared/config/themes.ts：内置主题注册表。
+- src-tauri/src/main.rs：桌面启动和 Tauri 命令注册。
+- src-tauri/src/services/clipboard：采集、识别、转换、去重和存储流水线。
+- src-tauri/src/services/clipboard_ops.rs：写入剪贴板、恢复焦点和粘贴。
+- src-tauri/src/infrastructure/repository：SQLite 操作及数据库升级。
 
----
+数据库升级 11 会清理已删除功能的设置和同步元数据，保留历史、标签和附件。旧商店主题会回退到云母主题；旧主题商店令牌、缓存样式和公告缓存会在启动时清理。
 
-## 核心功能
+许可证为 [GPL-3.0](LICENSE)，保留原项目署名和历史。
 
-### 基础体验
-- **原生效率**：基于 Tauri 2 和 Rust 构建，极致的内存占用与流畅度。
-- **智能采集**：自动记录文字、富文本 (HTML)、图片、文件和目录路径。
-- **现代美学**：完美支持 云母/亚克力 背景效果及暗黑模式，内置 **5 款经过精心调优的主题样式**。
-- **贴边收纳**：支持自动停靠在屏幕边缘，节省桌面空间且随时呼出。
+### 材质主题与界面测试
 
-### 管理与增强
-- **标签系统**：通过自定义的多色标签对记录进行分类和整理。
-- **表情管理**：内置完整的 Emoji 表情库，支持快捷搜索与输入。
-- **高级设置**：精细化控制清理规则、全局快捷键映射及各种核心逻辑。
-- **隐私脱敏**：智能识别身份证、手机号、邮箱等隐私信息，预览时自动脱敏。
+云母、毛玻璃和液态玻璃支持浅色、深色与跟随系统。液态玻璃可在「界面设置」中调整通透度（0–100%）和控件模糊度（0–32px）。窗口背后的桌面材质由 Windows 提供；模糊度滑块调整应用内导航和控件的效果，不能修改 Windows 固定的桌面模糊半径。Windows 10 使用实色降级。
 
-### 网络与传输
-- **WebDAV 同步**：数据由你掌控，实现完美的跨设备历史同步。
-- **局域网传输**：在局域网内无缝且极速地传输文件和内容。
-- **秒传验证码**：手机端收到的短信验证码，瞬间同步至你正在操作的设备。
-- **MQTT 协议**：基于极轻量协议的同步方案，确保不同网络环境下的高实时性。
+设计参考：[Apple 材质规范](https://developer.apple.com/design/human-interface-guidelines/materials)、[Microsoft 云母](https://learn.microsoft.com/en-us/windows/apps/design/style/mica)与[毛玻璃](https://learn.microsoft.com/en-us/windows/apps/design/style/acrylic)。
 
-### 效率提速
-- **外部协作**：一键调用外部编辑器修改内容，存盘后自动写回记录。
-- **全局搜索**：支持按内容、所属应用、标签或日期进行全文检索。
-- **顺序粘贴**：为高频办公场景设计的顺序拷贝/顺序粘贴工作流程。
-
----
-
-## 系统要求
-
-### 平台支持
-| 平台 | 运行环境要求 | 获取格式 |
-| :--- | :--- | :--- |
-| **Windows** | Windows 10/11 (x86/x64)<br>*(推荐使用 Win11)* | `.exe` / **`.zip` (便携版)** |
-| **macOS** | Sierra 10.15+ <br>(Apple Silicon / Intel) | `.dmg` |
-| **Linux** | 即将支持 | 敬请期待 |
-
-[**前往 Releases 下载最新版本 →**](https://github.com/jimuzhe/tiez-clipboard/releases)
-
----
-
-## Star History
-
-<div align="center">
-  <a href="https://star-history.com/#jimuzhe/tiez-clipboard&Date">
-    <img src="https://api.star-history.com/svg?repos=jimuzhe/tiez-clipboard&type=Date" alt="Star History Chart" width="800" />
-  </a>
-</div>
-
----
-
-## 交流与赞助
-
-如果 TieZ 提高了你的工作效率，欢迎赞助本项目持续演进。
-
-<div align="center">
-  <table style="border: none;">
-    <tr>
-      <td align="center" style="border: none;">
-        <p><strong>微信赞赏</strong></p>
-        <img src="docs/images/wx.jpeg" alt="微信收款码" width="180" height="180" />
-      </td>
-      <td align="center" style="border: none;">
-        <p><strong>支付宝赞赏</strong></p>
-        <img src="docs/images/zfb.jpeg" alt="支付宝收款码" width="180" height="180" />
-      </td>
-      <td align="center" style="border: none;">
-        <p><strong>QQ 交流群</strong></p>
-        <img src="docs/images/qq.jpeg" alt="QQ 群二维码" width="180" height="180" />
-      </td>
-    </tr>
-  </table>
-  <br>
-  <p>每一份支持都是开发者保持更新的动力！</p>
-  <a href="https://tiez.name666.top/zh/sponsors.html"><strong>查看打赏赞助名单</strong></a>
-</div>
-
----
-
-<div align="center">
-  为每一个追求极致效率的开发者倾力打造。
-  <br>
-  <b>如果你喜欢这个项目，欢迎点个 Star。</b>
-</div>
+首次执行 `npx playwright install chromium`，然后运行 `npm run test:ui`。测试使用虚构条目并拦截全部 Tauri 命令，不访问真实剪贴板和数据库。也可通过 `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` 指定已有的 Chromium。检查范围见[验证说明](docs/UI-VERIFICATION.md)。

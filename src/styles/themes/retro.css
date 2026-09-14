@@ -156,7 +156,6 @@ body.theme-retro {
   --scrollbar-thumb-color: var(--text-secondary);
   --scrollbar-thumb-hover-color: var(--text-primary);
   --scrollbar-thumb-border: 3.5px solid transparent;
-  --scrollbar-chat-thumb-border: 2px solid var(--bg-body);
 
   --meta-text-transform: uppercase;
   --meta-letter-spacing: 0.5px;

@@ -1,5 +1,4 @@
 import { useCallback, useRef } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { translations } from "../../../locales";
 import AdvancedSettingsGroup from "./groups/AdvancedSettingsGroup";
 import { useAppState } from "../../app/hooks/useAppState";
@@ -54,31 +53,7 @@ const AdvancedSettingsWindow = () => {
         setShowSearchBox,
         setScrollTopButtonEnabled,
         setArrowKeySelection,
-        setMqttEnabled,
-        setMqttServer,
         setRegistryWinVEnabled,
-        setMqttPort,
-        setMqttUser,
-        setMqttPass,
-        setMqttTopic,
-        setMqttProtocol,
-        setMqttWsPath,
-        setMqttNotificationEnabled,
-        setCloudSyncEnabled,
-        setCloudSyncAuto,
-        setCloudSyncProvider,
-        setCloudSyncServer,
-        setCloudSyncApiKey,
-        setCloudSyncIntervalSec,
-        setCloudSyncSnapshotIntervalMin,
-        setCloudSyncWebdavUrl,
-        setCloudSyncWebdavUsername,
-        setCloudSyncWebdavPassword,
-        setCloudSyncWebdavBasePath,
-        setFileServerAutoClose,
-        setFileTransferAutoOpen,
-        setFileTransferAutoCopy,
-        setFileServerPort,
         setSequentialHotkey,
         setRichPasteHotkey,
         setSearchHotkey,
@@ -99,31 +74,17 @@ const AdvancedSettingsWindow = () => {
         setAutoStart,
         setWinClipboardDisabled,
         setDefaultApps,
-        setFileServerEnabled,
-        setActualPort,
-        setLocalIp,
-        setAvailableIps,
         setDataPath,
         setInstalledApps,
         setIsWindowPinned,
-        setAiEnabled,
-        setAiTargetLang,
-        setAiThinkingBudget,
-        setAiProfiles,
-        setAiAssignedProfileTask,
-        setAiAssignedProfileMouthpiece,
-        setAiAssignedProfileTranslate,
         setSettingsLoaded,
         setSoundEnabled,
         setSoundVolume,
         setPasteSoundEnabled,
         setPasteMethod,
         installedApps,
-        setFileTransferPath,
         hideDockIcon: _hideDockIcon,
         setHideDockIcon,
-        cloudSyncContentPrefs: _cloudSyncContentPrefs,
-        setCloudSyncContentPrefs
     } = appState;
 
     const tagManagerSizeRef = useRef<{ width: number; height: number } | null>(null);
@@ -174,31 +135,7 @@ const AdvancedSettingsWindow = () => {
         setShowSearchBox,
         setScrollTopButtonEnabled,
         setArrowKeySelection,
-        setMqttEnabled,
-        setMqttServer,
         setRegistryWinVEnabled,
-        setMqttPort,
-        setMqttUser,
-        setMqttPass,
-        setMqttTopic,
-        setMqttProtocol,
-        setMqttWsPath,
-        setMqttNotificationEnabled,
-        setCloudSyncEnabled,
-        setCloudSyncAuto,
-        setCloudSyncProvider,
-        setCloudSyncServer,
-        setCloudSyncApiKey,
-        setCloudSyncIntervalSec,
-        setCloudSyncSnapshotIntervalMin,
-        setCloudSyncWebdavUrl,
-        setCloudSyncWebdavUsername,
-        setCloudSyncWebdavPassword,
-        setCloudSyncWebdavBasePath,
-        setFileServerAutoClose,
-        setFileTransferAutoOpen,
-        setFileTransferAutoCopy,
-        setFileServerPort,
         setSequentialHotkey,
         setRichPasteHotkey,
         setSearchHotkey,
@@ -208,14 +145,7 @@ const AdvancedSettingsWindow = () => {
         setSoundVolume,
         setPasteSoundEnabled,
         setPasteMethod,
-        setAiEnabled,
-        setAiTargetLang,
-        setAiThinkingBudget,
         setIsWindowPinned,
-        setAiProfiles,
-        setAiAssignedProfileTask,
-        setAiAssignedProfileMouthpiece,
-        setAiAssignedProfileTranslate,
         setSettingsLoaded,
         setClipboardItemFontSize,
         setClipboardTagFontSize,
@@ -223,27 +153,15 @@ const AdvancedSettingsWindow = () => {
         setTagManagerEnabled,
         setEmojiPanelTab,
         setEmojiFavorites,
-        setHideDockIcon,
-        setCloudSyncContentPrefs
+        setHideDockIcon
     });
 
-    const fetchEffectiveTransferPath = useCallback(() => {
-        invoke<string>("get_active_file_transfer_path")
-            .then(setFileTransferPath)
-            .catch(console.error);
-    }, [setFileTransferPath]);
-
     useAppBootstrap({
-        fetchEffectiveTransferPath,
         setDataPath,
         setInstalledApps,
         setAutoStart,
         setWinClipboardDisabled,
-        setDefaultApps,
-        setFileServerEnabled,
-        setActualPort,
-        setLocalIp,
-        setAvailableIps
+        setDefaultApps
     });
 
     useSettingsApply({
@@ -254,7 +172,8 @@ const AdvancedSettingsWindow = () => {
         settingsLoaded,
         clipboardItemFontSize,
         clipboardTagFontSize,
-        surfaceOpacity
+        surfaceOpacity,
+        liquidGlassBlur: Number(appState.appSettings["app.liquid_glass_blur"] ?? 18)
     });
 
     useCustomBackground({
@@ -262,7 +181,6 @@ const AdvancedSettingsWindow = () => {
         customBackgroundOpacity,
         theme
     });
-
 
     return (
         <div className="advanced-settings-window-shell">

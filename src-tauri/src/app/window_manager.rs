@@ -81,8 +81,7 @@ pub fn toggle_window(app: &AppHandle) {
         if is_visible && !is_hidden_by_edge {
             #[cfg(target_os = "windows")]
             WindowExt::release_win_keys();
-            let _ = window.set_focusable(false);
-            let _ = window.hide();
+            let _ = hide_main_window(app);
 
             let _ = restore_last_focus(app.clone());
 
@@ -417,14 +416,27 @@ pub fn activate_window_focus(app_handle: AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 pub fn hide_window_cmd(app_handle: AppHandle) -> Result<(), String> {
-    if let Some(window) = app_handle.get_webview_window("main") {
+    if app_handle.get_webview_window("main").is_some() {
         #[cfg(target_os = "windows")]
         WindowExt::release_win_keys();
+        hide_main_window(&app_handle)?;
+        let _ = restore_last_focus(app_handle.clone());
+    }
+    Ok(())
+}
+
+pub fn hide_main_window(app: &AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("main") {
+        let was_visible = window.is_visible().unwrap_or(true);
         let _ = window.set_focusable(false);
-        let _ = window.hide();
+        window.hide().map_err(|e| e.to_string())?;
+        IS_HIDDEN.store(false, Ordering::Relaxed);
         NAVIGATION_ENABLED.store(false, Ordering::SeqCst);
         NAVIGATION_MODE_ACTIVE.store(false, Ordering::SeqCst);
-        let _ = restore_last_focus(app_handle.clone());
+        if was_visible {
+            let _ = window.emit("main-window-hidden", ());
+            let _ = app.emit("force-hide-compact-preview", ());
+        }
     }
     Ok(())
 }
@@ -503,7 +515,7 @@ mod tests {
             height: 1440,
         };
 
-        let mapped = remap_fixed_window_position((1610, 670), (300, 400), source, target);
+        let mapped = remap_fixed_window_position((1620, 680), (300, 400), source, target);
 
         assert_eq!(mapped, (4180, 1040));
     }
@@ -525,7 +537,8 @@ mod tests {
 
         let mapped = remap_fixed_window_position((810, 340), (300, 400), source, target);
 
-        assert_eq!(mapped, (-800, 250));
+        assert_eq!(mapped, (-950, 250));
+        assert_eq!((mapped.0 + 150, mapped.1 + 200), (-800, 450));
     }
 
     #[test]

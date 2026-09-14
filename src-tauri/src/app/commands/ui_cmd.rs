@@ -88,6 +88,15 @@ pub fn set_theme(
     }
     let show_border = effective_show_app_border.unwrap_or(true);
 
+    // Set Tao's preferred theme too. A DWM attribute alone is overwritten by
+    // WM_SETTINGCHANGE (including the system theme refresh during logon).
+    let preferred_theme = match effective_color_mode.as_deref() {
+        Some("light") => Some(Theme::Light),
+        Some("dark") => Some(Theme::Dark),
+        _ => None,
+    };
+    window.set_theme(preferred_theme).map_err(|e| AppError::Internal(e.to_string()))?;
+
     if let Ok(mut guard) = state.theme.lock() {
         *guard = theme.clone();
     }
@@ -158,7 +167,7 @@ pub fn set_theme(
                 let _ = window_vibrancy::apply_mica(&window, Some(is_dark));
                 let _ = window.set_shadow(show_border);
             }
-            "acrylic" if is_win10_1803 && !is_win10 => {
+            "acrylic" | "liquid-glass" if is_win10_1803 && !is_win10 => {
                 let _ = window_vibrancy::apply_acrylic(
                     &window,
                     Some(if is_dark {
@@ -169,7 +178,7 @@ pub fn set_theme(
                 );
                 let _ = window.set_shadow(show_border);
             }
-            "acrylic" if is_win10 => {
+            "acrylic" | "liquid-glass" if is_win10 => {
                 let _ = window.set_shadow(false);
             }
             _ => {
@@ -188,7 +197,7 @@ pub fn set_theme(
         };
 
         let _ = window_vibrancy::clear_vibrancy(&window);
-        if theme == "mica" || theme == "acrylic" {
+        if theme == "mica" || theme == "acrylic" || theme == "liquid-glass" {
             let _ = window_vibrancy::apply_vibrancy(
                 &window,
                 window_vibrancy::NSVisualEffectMaterial::HudWindow,

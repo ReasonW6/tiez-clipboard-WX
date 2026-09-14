@@ -3,7 +3,6 @@ import type { ComponentProps, RefObject, ReactNode } from "react";
 import { motion, Reorder, useDragControls } from "framer-motion";
 import type { DragControls } from "framer-motion";
 import { ArrowUp, Clipboard } from "lucide-react";
-import FileTransferChatView from "../../file-transfer/components/FileTransferChatView";
 import SettingsPanel from "../../settings/components/SettingsPanel";
 import TagManager from "../../tag/components/TagManager";
 import EmojiPanel from "../../emoji/components/EmojiPanel";
@@ -26,9 +25,7 @@ interface AppMainContentProps {
   showTagManager: boolean;
   tagManagerEnabled: boolean;
   showEmojiPanel: boolean;
-  chatMode: boolean;
-  localIp: string;
-  actualPort: string;
+
   settingsPanelProps: SettingsPanelProps;
   emojiFavorites: string[];
   setEmojiFavorites: (val: string[] | ((prev: string[]) => string[])) => void;
@@ -99,9 +96,6 @@ const AppMainContent = ({
   showTagManager,
   tagManagerEnabled,
   showEmojiPanel,
-  chatMode,
-  localIp,
-  actualPort,
   settingsPanelProps,
   emojiFavorites,
   setEmojiFavorites,
@@ -192,8 +186,8 @@ const AppMainContent = ({
   if (showTagManager && tagManagerEnabled) {
     return (
       <motion.div
-        initial={{ opacity: 0, x: 20 }}
-        animate={{ opacity: 1, x: 0 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
         style={{ height: "100%" }}
       >
         <TagManager t={t} theme={theme} />
@@ -221,17 +215,6 @@ const AppMainContent = ({
   }
 
   if (showSettings) {
-    if (chatMode) {
-      return (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          style={{ height: "100%", overflow: "hidden" }}
-        >
-          <FileTransferChatView t={t} localIp={localIp} actualPort={actualPort} />
-        </motion.div>
-      );
-    }
 
     return (
       <motion.div
@@ -346,4 +329,3 @@ const AppMainContent = ({
 };
 
 export default AppMainContent;
-

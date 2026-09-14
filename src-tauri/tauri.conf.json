@@ -5,9 +5,9 @@
   "identifier": "com.tiez",
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEE0MDY1QzlGQkU0ODcwMjMKUldRamNFaStuMXdHcEtFWlNINnVJcVgxa2tRb0wrRlBjdzRmZ3Z1WGJxZ1V3R0w5ZmNUemtvRjMK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDY1MDVCQ0IxQzM5M0YxNUUKUldSZThaUERzYndGWlRNcjBOOW40ZTk0YnlLS0NHdkRyV3VLdXhodWhYMG45UVRJRVRoaGFBTm8K",
       "endpoints": [
-        "https://tiez.name666.top/api/v1/latest-version?platform={{target}}"
+        "https://github.com/ReasonW6/tiez-clipboard-WX/releases/latest/download/latest.json"
       ]
     }
   },
@@ -125,10 +125,7 @@
               "identifier": "opener:allow-open-url",
               "allow": [
                 {
-                  "url": "https://tiez.name666.top/**"
-                },
-                {
-                  "url": "https://github.com/jimuzhe/tie-z/**"
+                  "url": "https://github.com/ReasonW6/tiez-clipboard-WX/**"
                 }
               ]
             },
@@ -142,16 +139,16 @@
   },
   "bundle": {
     "active": true,
-    "createUpdaterArtifacts": true,
+    "createUpdaterArtifacts": false,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
-      "icons/app.icns"
+      "icons/icon.icns",
+      "icons/icon.ico"
     ],
     "targets": [
-      "dmg",
-      "app"
+      "nsis"
     ],
     "macOS": {
       "frameworks": [],

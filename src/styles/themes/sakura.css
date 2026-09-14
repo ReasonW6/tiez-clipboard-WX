@@ -116,7 +116,6 @@ body.theme-sakura {
   --scrollbar-thumb-color: rgba(180, 120, 140, 0.35);
   --scrollbar-thumb-hover-color: rgba(212, 96, 122, 0.5);
   --scrollbar-thumb-border: 2px solid transparent;
-  --scrollbar-chat-thumb-border: 2px solid transparent;
 
   --content-font-family: var(--font-main);
   --content-line-height: 1.5;
@@ -179,12 +178,6 @@ body.theme-sakura #root > * {
 .theme-sakura .themed-tag-manager .tag-sidebar {
   border-top: 2px solid transparent;
   border-image: linear-gradient(90deg, transparent, rgba(212, 96, 122, 0.3), rgba(240, 160, 180, 0.2), transparent) 1;
-}
-
-/* --- Announcement ticker: sakura style --- */
-.theme-sakura .announcement-ticker {
-  border-bottom: 1px solid rgba(212, 96, 122, 0.1);
-  font-family: var(--font-main);
 }
 
 .theme-sakura .ticker-icon {
@@ -326,11 +319,6 @@ body.dark-mode.theme-sakura #root::after {
 /* Dark mode: fainter petal pattern */
 body.dark-mode.theme-sakura::before {
   opacity: 0.35;
-}
-
-/* Dark mode: announcement ticker */
-.dark-mode .theme-sakura .announcement-ticker {
-  border-bottom-color: rgba(232, 112, 136, 0.1);
 }
 .dark-mode .theme-sakura .ticker-icon {
   border-right-color: rgba(255, 255, 255, 0.06);

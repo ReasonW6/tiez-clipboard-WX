@@ -1,0 +1,29 @@
+# 主题、窗口状态与标签修复验证
+
+## 修复范围
+
+- 原生窗口通过 Tauri/Tao 的 preferred theme 锁定手动明暗模式，并同步 DWM 材质。前端命令使用正确的 camelCase 参数，按顺序提交，避免快速切换时旧请求覆盖新选择。启动时先读取已缓存的颜色模式，SQLite 设置加载后再校准。
+- 热键、关闭按钮、失焦隐藏、粘贴后隐藏、边缘停靠隐藏统一通知前端重置临时页面状态。仅失去焦点而未隐藏的固定窗口继续保留当前页面。历史数据、标签及用户偏好不在重置范围内。
+- 剪贴板采集去重时保留原记录的标签、敏感标记、置顶信息和使用次数。更新记录与标签关联在同一事务内完成，随后才执行容量清理。数据库查询失败时停止本次分发，避免展示未保存的记录。
+- 标签页小于等于 620px 时使用顶部标签栏，更宽时使用侧栏。标签切换和刷新使用请求序号防止过期响应覆盖当前内容；读取失败保留已有条目并显示错误。编辑及批量粘贴按 ID 读取完整内容，避免使用列表截断预览。
+- 标签页仍保留原有的删除语义：删除标签会删除该标签下的所有条目，操作前有明确确认；单条删除和粘贴是独立按钮。
+- 重做云母和毛玻璃材质，加入液态玻璃、通透度与控件模糊度调节。适配明暗模式、Windows 10 实色降级、减少透明度与减少动态效果。
+
+## 自动检查
+
+本次执行结果：22 项前端测试、65 项 Rust 测试、26 项浏览器回归通过，TypeScript 与 Vite 生产构建通过。Rust 最终全量测试使用正常 Windows 用户凭据验证 DPAPI。
+
+- `npm test`：前端单元测试及设置页渲染。
+- `npm run test:ui`：Playwright 浏览器回归。覆盖全部七款主题与相反系统明暗、快速切换、关闭重置、固定窗口失焦、320/425/780px 标签布局、响应乱序、失败时保留内容、粘贴参数、编辑/删除命中区域、长文本与设置重载。
+- `cargo test --offline --manifest-path src-tauri/Cargo.toml --bin tiez-app`：Rust 回归，包含真实内存 SQLite 中的去重、标签索引、容量清理及 DPAPI 密文检查。Windows DPAPI 检查需要有效用户凭据，受限沙盒账户可能无法执行；请在正常 Windows 用户会话运行。
+- `npm run build`：TypeScript 与 Vite 生产构建。
+
+首次运行浏览器测试需要 `npx playwright install chromium`。也可通过 `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` 指定已有的 Chromium。测试页面仅存在于 tests/ui/harness.html，不会进入 Vite 正式构建入口。所有 Tauri 调用都被拦截，只使用虚构数据，不访问真实剪贴板、文件或数据库。
+
+本次本地发行构建已生成 NSIS 安装包、更新签名与便携 ZIP。安装包使用配置中的公钥验证通过，篡改单字节的副本被拒绝；便携 ZIP 内的 TieZ.exe 与本次发行程序哈希相同，且只包含程序、空 data 目录、许可证和使用说明。哈希记录位于 artifacts/build-verification.json，界面对比预览位于 artifacts/ui-preview/index.html。
+
+## 材质边界与人工检查
+
+液态玻璃参考 [Apple Materials](https://developer.apple.com/design/human-interface-guidelines/materials)，把玻璃用于导航和控件；云母与毛玻璃参考 [Microsoft Mica](https://learn.microsoft.com/en-us/windows/apps/design/style/mica) 和 [Acrylic](https://learn.microsoft.com/en-us/windows/apps/design/style/acrylic)。Windows 原生背景与 CSS 控件材质共同实现外观，不包含 Apple 平台的原生折射渲染器。模糊滑块只调整应用内控件背后的内容，Windows 原生桌面模糊半径固定。
+
+浏览器预览可以核对布局和网页颜色，不能证明 DWM 桌面材质、实际粘贴目标或开机自启动行为。发布后可在正常用户会话选择毛玻璃浅色、保持系统深色，再重启检查自启动；同时复核固定与非固定模式下的标签粘贴及重新呼出主页。本次未重启用户电脑，也未操作其真实剪贴板或数据库。

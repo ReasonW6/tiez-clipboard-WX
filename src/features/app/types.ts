@@ -1,27 +1,13 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { ClipboardEntry, Locale } from "../../shared/types";
-import type { AiProfile, AppCleanupPolicy } from "../settings/types";
+import type { AppCleanupPolicy } from "../settings/types";
 
 export type StateSetter<T> = Dispatch<SetStateAction<T>>;
 
 export type InstalledAppOption = { label: string; value: string };
 export type DefaultAppsMap = Record<string, string>;
 export type QuickPasteModifier = "disabled" | "ctrl" | "alt" | "shift" | "win";
-export type SettingsSubpage = "home" | "advanced" | "theme-store";
-
-export type CloudSyncContentPrefs = {
-  text: boolean;
-  image: boolean;
-  file_path: boolean;
-  emoji: boolean;
-};
-
-export const DEFAULT_CLOUD_SYNC_CONTENT_PREFS: CloudSyncContentPrefs = {
-  text: true,
-  image: true,
-  file_path: true,
-  emoji: true
-};
+export type SettingsSubpage = "home" | "advanced";
 
 export interface AppState {
   showSettings: boolean;
@@ -50,8 +36,7 @@ export interface AppState {
   setShowEmojiPanel: StateSetter<boolean>;
   emojiFavorites: string[];
   setEmojiFavorites: StateSetter<string[]>;
-  aiOptionsOpenId: number | null;
-  setAiOptionsOpenId: StateSetter<number | null>;
+
   editingTagsId: number | null;
   setEditingTagsId: StateSetter<number | null>;
   revealedIds: Set<number>;
@@ -72,8 +57,7 @@ export interface AppState {
   setDefaultApps: StateSetter<DefaultAppsMap>;
   showAppSelector: string | null;
   setShowAppSelector: StateSetter<string | null>;
-  chatMode: boolean;
-  setChatMode: StateSetter<boolean>;
+
   installedApps: InstalledAppOption[];
   setInstalledApps: StateSetter<InstalledAppOption[]>;
   dataPath: string;
@@ -155,8 +139,7 @@ export interface AppState {
   setEmojiPanelTab: StateSetter<"emoji" | "favorites">;
   showHotkeyHint: boolean;
   setShowHotkeyHint: StateSetter<boolean>;
-  showAutoCloseHint: boolean;
-  setShowAutoCloseHint: StateSetter<boolean>;
+
   language: Locale;
   setLanguage: StateSetter<Locale>;
   settingsLoaded: boolean;
@@ -191,88 +174,14 @@ export interface AppState {
   setHasMore: StateSetter<boolean>;
   currentOffset: number;
   setCurrentOffset: StateSetter<number>;
-  mqttEnabled: boolean;
-  setMqttEnabled: StateSetter<boolean>;
-  mqttServer: string;
-  setMqttServer: StateSetter<string>;
-  mqttPort: string;
-  setMqttPort: StateSetter<string>;
-  mqttUser: string;
-  setMqttUser: StateSetter<string>;
-  mqttPass: string;
-  setMqttPass: StateSetter<string>;
-  mqttTopic: string;
-  setMqttTopic: StateSetter<string>;
-  mqttProtocol: string;
-  setMqttProtocol: StateSetter<string>;
-  mqttWsPath: string;
-  setMqttWsPath: StateSetter<string>;
-  mqttNotificationEnabled: boolean;
-  setMqttNotificationEnabled: StateSetter<boolean>;
-  cloudSyncEnabled: boolean;
-  setCloudSyncEnabled: StateSetter<boolean>;
-  cloudSyncAuto: boolean;
-  setCloudSyncAuto: StateSetter<boolean>;
-  cloudSyncProvider: "http" | "webdav";
-  setCloudSyncProvider: StateSetter<"http" | "webdav">;
-  cloudSyncServer: string;
-  setCloudSyncServer: StateSetter<string>;
-  cloudSyncApiKey: string;
-  setCloudSyncApiKey: StateSetter<string>;
-  cloudSyncIntervalSec: string;
-  setCloudSyncIntervalSec: StateSetter<string>;
-  cloudSyncSnapshotIntervalMin: string;
-  setCloudSyncSnapshotIntervalMin: StateSetter<string>;
-  cloudSyncWebdavUrl: string;
-  setCloudSyncWebdavUrl: StateSetter<string>;
-  cloudSyncWebdavUsername: string;
-  setCloudSyncWebdavUsername: StateSetter<string>;
-  cloudSyncWebdavPassword: string;
-  setCloudSyncWebdavPassword: StateSetter<string>;
-  cloudSyncWebdavBasePath: string;
-  setCloudSyncWebdavBasePath: StateSetter<string>;
-  cloudSyncContentPrefs: CloudSyncContentPrefs;
-  setCloudSyncContentPrefs: StateSetter<CloudSyncContentPrefs>;
-  fileServerEnabled: boolean;
-  setFileServerEnabled: StateSetter<boolean>;
-  fileServerPort: string;
-  setFileServerPort: StateSetter<string>;
-  localIp: string;
-  setLocalIp: StateSetter<string>;
-  availableIps: string[];
-  setAvailableIps: StateSetter<string[]>;
-  actualPort: string;
-  setActualPort: StateSetter<string>;
-  fileTransferPath: string;
-  setFileTransferPath: StateSetter<string>;
-  fileTransferAutoOpen: boolean;
-  setFileTransferAutoOpen: StateSetter<boolean>;
-  fileTransferAutoCopy: boolean;
-  setFileTransferAutoCopy: StateSetter<boolean>;
-  fileServerAutoClose: boolean;
-  setFileServerAutoClose: StateSetter<boolean>;
+
   soundEnabled: boolean;
   setSoundEnabled: StateSetter<boolean>;
   pasteSoundEnabled: boolean;
   setPasteSoundEnabled: StateSetter<boolean>;
   soundVolume: number;
   setSoundVolume: StateSetter<number>;
-  aiEnabled: boolean;
-  setAiEnabled: StateSetter<boolean>;
-  aiTargetLang: string;
-  setAiTargetLang: StateSetter<string>;
-  aiThinkingBudget: string;
-  setAiThinkingBudget: StateSetter<string>;
-  aiProfiles: AiProfile[];
-  setAiProfiles: StateSetter<AiProfile[]>;
-  aiAssignedProfileTask: string;
-  setAiAssignedProfileTask: StateSetter<string>;
-  aiAssignedProfileMouthpiece: string;
-  setAiAssignedProfileMouthpiece: StateSetter<string>;
-  aiAssignedProfileTranslate: string;
-  setAiAssignedProfileTranslate: StateSetter<string>;
-  processingAiId: number | null;
-  setProcessingAiId: StateSetter<number | null>;
+
   typeFilter: string | null;
   setTypeFilter: StateSetter<string | null>;
 }

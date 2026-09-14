@@ -1,0 +1,109 @@
+/* One material backdrop, with quieter content surfaces above it. */
+:is(:root, body):where(.theme-mica, .theme-acrylic, .theme-liquid-glass) {
+  --bg-body: transparent;
+  --bg-content: transparent;
+  --bg-toolbar: transparent;
+  --accent-color: #356ad8;
+  --accent-color-rgb: 53, 106, 216;
+  --accent-hover: #285bbf;
+  --text-primary: #202631;
+  --text-secondary: #586374;
+  --text-muted: #697586;
+  --material-solid: #f3f5f8;
+  --line-soft: rgba(44,56,76,.1);
+  --line-strong: rgba(44,56,76,.18);
+  --shadow-xs: 0 1px 3px rgba(20,35,55,.05);
+  --shadow-sm: 0 3px 10px rgba(20,35,55,.06);
+  --shadow-md: 0 8px 22px rgba(20,35,55,.09);
+  --shadow-lg: 0 16px 40px rgba(20,35,55,.14);
+  --shadow-inset: inset 0 1px 0 rgba(255,255,255,.5);
+  --shell-background: var(--bg-window);
+  --shell-radius: 14px;
+  --shell-border: 1px solid rgba(255,255,255,.5);
+  --shell-shadow: inset 0 0 0 1px rgba(255,255,255,.15);
+  --shell-backdrop-filter: none;
+  --toolbar-border: 1px solid var(--line-soft);
+  --button-border: 1px solid var(--line-soft);
+  --button-radius: 9px;
+  --button-shadow: none;
+  --button-hover-shadow: var(--shadow-xs);
+  --button-hover-transform: none;
+  --button-active-shadow: none;
+  --button-active-filled-shadow: 0 2px 6px rgba(var(--accent-color-rgb),.14);
+  --input-border: 1px solid var(--line-soft);
+  --input-radius: 10px;
+  --input-shadow: none;
+  --input-focus-shadow: 0 0 0 2px rgba(var(--accent-color-rgb),.12);
+  --card-border: 1px solid var(--line-soft);
+  --card-radius: 12px;
+  --card-shadow: var(--shadow-xs);
+  --card-hover-shadow: var(--shadow-sm);
+  --card-hover-transform: none;
+  --card-selected-background: rgba(var(--accent-color-rgb),.1);
+  --card-selected-border-color: rgba(var(--accent-color-rgb),.4);
+  --card-selected-shadow: none;
+  --panel-border: 1px solid var(--line-soft);
+  --panel-radius: 12px;
+  --panel-shadow: none;
+  --panel-divider-color: var(--line-soft);
+  --data-panel-border: 1px solid var(--line-soft);
+  --data-panel-shadow: none;
+  --segment-active-background: rgba(255,255,255,.85);
+  --segment-active-shadow: var(--shadow-xs);
+  --menu-border: 1px solid var(--line-soft);
+  --menu-shadow: var(--shadow-lg);
+  --scrollbar-size: 7px;
+  --scrollbar-size-thin: 4px;
+  --scrollbar-radius: 999px;
+  --scrollbar-track-background: transparent;
+  --scrollbar-track-border-start: none;
+  --scrollbar-thumb-color: rgba(100,115,138,.3);
+  --scrollbar-thumb-hover-color: rgba(100,115,138,.55);
+  --scrollbar-thumb-border: 2px solid transparent;
+  --queue-border: 1px solid var(--line-soft);
+  --queue-shadow: var(--shadow-md);
+}
+:is(:root, body):where(.theme-mica, .theme-acrylic, .theme-liquid-glass).dark-mode {
+  --text-primary: #f0f2f6;
+  --text-secondary: #b0b8c6;
+  --text-muted: #a1acbd;
+  --material-solid: #232731;
+  --accent-color: #8aacff;
+  --accent-color-rgb: 138,172,255;
+  --accent-hover: #739bfd;
+  --button-active-filled-color: #152138;
+  --line-soft: rgba(230,238,255,.1);
+  --line-strong: rgba(230,238,255,.2);
+  --shell-border: 1px solid rgba(230,238,255,.14);
+  --shadow-xs: 0 1px 3px rgba(0,0,0,.12);
+  --shadow-sm: 0 4px 12px rgba(0,0,0,.14);
+  --shadow-md: 0 10px 28px rgba(0,0,0,.18);
+  --shadow-lg: 0 18px 44px rgba(0,0,0,.25);
+  --shadow-inset: inset 0 1px 0 rgba(255,255,255,.06);
+  --segment-active-background: rgba(226,235,255,.13);
+  --shell-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+}
+body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) { position: relative; isolation: isolate; }
+body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass).has-custom-bg::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: var(--custom-bg-image) center / cover no-repeat; opacity: var(--custom-bg-opacity,.45);
+}
+body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) #root { position: relative; }
+body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) .settings-group { box-shadow: none; }
+body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) .tm-dialog { background: var(--material-solid); }
+body.windows-10:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) { --bg-window: var(--material-solid); }
+body.compact-preview:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) #root {
+  background: transparent !important; border: none !important; box-shadow: none !important; backdrop-filter: none !important;
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root:is(.theme-mica, .theme-acrylic, .theme-liquid-glass), body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) {
+    --bg-window: var(--material-solid) !important; --glass-blur: 0px !important; --glass-fill: var(--material-solid) !important;
+  }
+}
+@media (forced-colors: active) {
+  :root:is(.theme-mica, .theme-acrylic, .theme-liquid-glass), body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) {
+    --bg-window: Canvas !important; --bg-panel: Canvas !important; --bg-element: Canvas !important; --bg-input: Canvas !important; --bg-button: Canvas !important;
+    --glass-fill: Canvas !important; --material-solid: Canvas !important; --text-primary: CanvasText !important; --text-secondary: CanvasText !important;
+    --line-soft: ButtonText !important; --line-strong: Highlight !important; --accent-color: Highlight !important; --glass-blur: 0px !important;
+  }
+}

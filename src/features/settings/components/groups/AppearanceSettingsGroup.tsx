@@ -9,7 +9,7 @@ import {
     supportsSurfaceOpacity
 } from "../../../../shared/config/themes";
 import type { Locale } from "../../../../shared/types";
-import type { SettingsSubpage } from "../../../app/types";
+import { clampGlassBlur } from "../../../../shared/lib/appearance";
 
 interface LabelWithHintProps {
     label: string;
@@ -42,9 +42,9 @@ interface AppearanceSettingsGroupProps {
     customBackgroundOpacity: number;
     setCustomBackgroundOpacity: (val: number) => void;
     surfaceOpacity: number;
+    liquidGlassBlur: number;
     setSurfaceOpacity: (val: number) => void;
     saveAppSetting: (key: string, val: string) => void;
-    setSettingsSubpage: (val: SettingsSubpage) => void;
 }
 
 const clampProgress = (value: number, min: number, max: number) => {
@@ -86,9 +86,9 @@ const AppearanceSettingsGroup = ({
     customBackgroundOpacity,
     setCustomBackgroundOpacity,
     surfaceOpacity,
+    liquidGlassBlur,
     setSurfaceOpacity,
     saveAppSetting,
-    setSettingsSubpage
 }: AppearanceSettingsGroupProps) => {
     const showCustomBackgroundControls = supportsCustomBackground(theme);
     const showSurfaceOpacityControls = supportsSurfaceOpacity(theme);
@@ -114,23 +114,15 @@ const AppearanceSettingsGroup = ({
                                     saveAppSetting('theme', themeItem.id);
                                 }}
                                 className={`btn-icon theme-choice-btn ${theme === themeItem.id ? 'active' : ''}`}
+                                aria-pressed={theme === themeItem.id}
                                 type="button"
                             >
+                                <span className={`theme-swatch theme-swatch-${themeItem.id}`} aria-hidden="true"><i /><i /><i /></span>
                                 <span className="theme-choice-title">
                                     {getThemeLabel(themeItem.id, language)}
                                 </span>
                             </button>
                         ))}
-                        <button
-                            onClick={() => setSettingsSubpage("theme-store")}
-                            className="btn-icon theme-choice-btn"
-                            type="button"
-                            style={{ gridColumn: "span 3", fontSize: "11px", opacity: 0.85 }}
-                        >
-                            <span className="theme-choice-title">
-                                {t("theme_store") || "🎨 主题商店"}
-                            </span>
-                        </button>
                     </div>
                 </div>
 
@@ -147,7 +139,6 @@ const AppearanceSettingsGroup = ({
                             <button
                                 key={modeItem.id}
                                 onClick={() => {
-                                    console.log('[THEME DEBUG] Saving color_mode:', modeItem.id);
                                     setColorMode(modeItem.id);
                                     saveAppSetting('color_mode', modeItem.id);
                                 }}
@@ -182,8 +173,6 @@ const AppearanceSettingsGroup = ({
                         ))}
                     </div>
                 </div>
-
-
 
                 <div className="setting-item">
                     <LabelWithHint
@@ -365,23 +354,31 @@ const AppearanceSettingsGroup = ({
                         {showSurfaceOpacityControls && (
                         <div className="setting-item column">
                             <div className="item-label-group" style={{ marginBottom: '4px', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span className="item-label">{t('surface_opacity') || '界面底板透明度'}</span>
-                                <span className="hint" style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{surfaceOpacity}%</span>
+                                <span className="item-label">{t(theme === 'liquid-glass' ? 'glass_clarity' : 'surface_opacity')}</span>
+                                <span className="hint" style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{theme === 'liquid-glass' ? 100 - surfaceOpacity : surfaceOpacity}%</span>
                             </div>
                             <input
                                 type="range"
                                 min="0"
                                 max="100"
-                                value={surfaceOpacity}
+                                aria-label={t(theme === 'liquid-glass' ? 'glass_clarity' : 'surface_opacity')}
+                                value={theme === 'liquid-glass' ? 100 - surfaceOpacity : surfaceOpacity}
                                 onChange={(e) => {
-                                    const val = parseInt(e.target.value);
+                                    const val = theme === 'liquid-glass' ? 100 - Number(e.target.value) : Number(e.target.value);
                                     setSurfaceOpacity(val);
                                     saveAppSetting('surface_opacity', String(val));
                                 }}
-                                style={buildRangeStyle(surfaceOpacity, 0, 100)}
+                                style={buildRangeStyle(theme === 'liquid-glass' ? 100 - surfaceOpacity : surfaceOpacity, 0, 100)}
                             />
                         </div>
                         )}
+                        {theme === 'liquid-glass' && <div className="setting-item column">
+                            <div className="glass-setting-label"><span className="item-label">{t('glass_blur')}</span><span>{clampGlassBlur(liquidGlassBlur)}px</span></div>
+                            <input type="range" aria-label={t('glass_blur')} min="0" max="32" step="1" value={clampGlassBlur(liquidGlassBlur)}
+                                onChange={event => saveAppSetting('liquid_glass_blur', event.target.value)} style={buildRangeStyle(clampGlassBlur(liquidGlassBlur), 0, 32)} />
+                            <div className="glass-range-labels"><span>{t('glass_clear')}</span><span>{t('glass_soft')}</span></div>
+                            <p className="glass-setting-hint">{t('glass_blur_hint')}</p>
+                        </div>}
                     </>
                 )}
             </div>

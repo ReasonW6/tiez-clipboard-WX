@@ -2,134 +2,77 @@ import { useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { applyThemeClasses, normalizeThemeId } from "../config/themes";
+import { applyColorMode, applySurfaceSettings } from "../lib/appearance";
 
 interface UseSettingsApplyOptions {
   theme: string;
   colorMode: string;
-
   compactMode: boolean;
   settingsLoaded: boolean;
   clipboardItemFontSize: number;
   clipboardTagFontSize: number;
   surfaceOpacity: number;
+  liquidGlassBlur?: number;
   showAppBorder: boolean;
 }
 
-export const useSettingsApply = ({
-  theme,
-  colorMode,
+// Keep rapid theme changes ordered so an older native request cannot win.
+let nativeThemeUpdate: Promise<unknown> = Promise.resolve();
 
-  compactMode,
-  settingsLoaded,
-  clipboardItemFontSize,
-  clipboardTagFontSize,
-  surfaceOpacity,
-  showAppBorder: _showAppBorder
+export const useSettingsApply = ({
+  theme, colorMode, compactMode, settingsLoaded, clipboardItemFontSize,
+  clipboardTagFontSize, surfaceOpacity, liquidGlassBlur = 18, showAppBorder
 }: UseSettingsApplyOptions) => {
   useEffect(() => {
-    if (!settingsLoaded) return;
-
-    const root = document.documentElement;
-    const body = document.body;
-
     let disposed = false;
-    const normalizedTheme = normalizeThemeId(theme);
-
-    const applyExplicitMode = (mode: "light" | "dark") => {
-      if (disposed) return;
-      root.classList.remove("light-mode", "dark-mode");
-      body.classList.remove("light-mode", "dark-mode");
-      if (mode === "dark") {
-        root.classList.add("dark-mode");
-        body.classList.add("dark-mode");
-      } else {
-        root.classList.add("light-mode");
-        body.classList.add("light-mode");
-      }
-    };
-
-    const applySystemMode = async () => {
-      try {
-        const current = await getCurrentWindow().theme();
-        if (disposed) return;
-        applyExplicitMode(current === "dark" ? "dark" : "light");
-      } catch {
-        if (disposed) return;
-        const isDark =
-          window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-        applyExplicitMode(isDark ? "dark" : "light");
-      }
-    };
-
-    applyThemeClasses(normalizedTheme, root, body);
-
-    if (compactMode) {
-      body.classList.add("compact-mode");
-    } else {
-      body.classList.remove("compact-mode");
-    }
-
-    if (colorMode === "light") {
-      applyExplicitMode("light");
-    } else if (colorMode === "dark") {
-      applyExplicitMode("dark");
-    } else {
-      applySystemMode();
-    }
-
-    invoke("set_theme", {
-      theme: normalizedTheme,
-      color_mode: colorMode,
+    void invoke<{ is_windows_10: boolean }>("get_platform_info").then(platform => {
+      if (!disposed) document.body.classList.toggle("windows-10", platform.is_windows_10);
     }).catch(console.error);
-
-    let unlisten: (() => void) | null = null;
-    let cleanupMedia: (() => void) | null = null;
-
-    if (colorMode === "system") {
-      getCurrentWindow()
-        .onThemeChanged((event) => {
-          if (disposed) return;
-          const next = event?.payload === "dark" ? "dark" : "light";
-          applyExplicitMode(next);
-          invoke("set_theme", {
-            theme: normalizedTheme,
-            color_mode: "system",
-          }).catch(console.error);
-        })
-        .then((f) => {
-          if (disposed) {
-            f();
-            return;
-          }
-          unlisten = f;
-        });
-
-      if (window.matchMedia) {
-        const media = window.matchMedia("(prefers-color-scheme: dark)");
-        const onChange = () => applyExplicitMode(media.matches ? "dark" : "light");
-        if (media.addEventListener) {
-          media.addEventListener("change", onChange);
-          cleanupMedia = () => media.removeEventListener("change", onChange);
-        } else {
-          media.addListener(onChange);
-          cleanupMedia = () => media.removeListener(onChange);
-        }
-      }
-    }
-
-    return () => {
-      disposed = true;
-      if (unlisten) unlisten();
-      if (cleanupMedia) cleanupMedia();
-    };
-  }, [theme, colorMode, settingsLoaded, compactMode]);
+    return () => { disposed = true; };
+  }, []);
 
   useEffect(() => {
     if (!settingsLoaded) return;
-    const root = document.documentElement;
-    root.style.setProperty("--clipboard-item-font-size", `${clipboardItemFontSize}px`);
-    root.style.setProperty("--clipboard-tag-font-size", `${clipboardTagFontSize}px`);
-    const scale = Math.min(2, Math.max(0, surfaceOpacity / 50));
-    root.style.setProperty("--surface-opacity-scale", scale.toString());
-  }, [clipboardItemFontSize, clipboardTagFontSize, surfaceOpacity, settingsLoaded]);
+    let disposed = false;
+    const normalizedTheme = normalizeThemeId(theme);
+    applyThemeClasses(normalizedTheme, document.documentElement, document.body);
+    if (colorMode === "light" || colorMode === "dark") applyColorMode(colorMode);
+
+    const updateNative = () => {
+      nativeThemeUpdate = nativeThemeUpdate.catch(() => {}).then(async () => {
+        if (disposed) return;
+        await invoke("set_theme", {
+          theme: normalizedTheme, colorMode, showAppBorder
+        });
+        // Query only after clearing the window's explicit mode when following the OS.
+        if (colorMode === "system" && !disposed) {
+          const mode = await getCurrentWindow().theme();
+          if (!disposed) applyColorMode(mode === "dark" ? "dark" : "light");
+        }
+      }).catch(error => {
+        console.error("Failed to apply window appearance", error);
+        if (!disposed && colorMode === "system") {
+          applyColorMode(window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        }
+      });
+    };
+    let unlisten: (() => void) | undefined;
+    if (colorMode === "system") {
+      void getCurrentWindow().onThemeChanged(event => {
+        if (disposed) return;
+        applyColorMode(event.payload === "dark" ? "dark" : "light");
+        updateNative();
+      }).then(off => { if (disposed) off(); else unlisten = off; }).catch(console.error);
+    }
+    updateNative();
+    return () => { disposed = true; unlisten?.(); };
+  }, [theme, colorMode, settingsLoaded, showAppBorder]);
+
+  useEffect(() => {
+    if (!settingsLoaded) return;
+    document.body.classList.toggle("compact-mode", compactMode);
+    document.documentElement.style.setProperty("--clipboard-item-font-size", `${clipboardItemFontSize}px`);
+    document.documentElement.style.setProperty("--clipboard-tag-font-size", `${clipboardTagFontSize}px`);
+    applySurfaceSettings(surfaceOpacity, liquidGlassBlur);
+  }, [compactMode, clipboardItemFontSize, clipboardTagFontSize, surfaceOpacity, liquidGlassBlur, settingsLoaded]);
 };

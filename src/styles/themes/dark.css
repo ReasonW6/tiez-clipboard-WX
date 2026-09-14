@@ -10,14 +10,6 @@
   border-color: rgba(255, 255, 255, 0.1);
 }
 
-:root.dark-mode .ai-profile-card{
-  border-bottom-color: rgba(255, 255, 255, 0.1);
-}
-
-:root.dark-mode .ai-profile-sub{
-  background: rgba(255, 255, 255, 0.1);
-}
-
 /* Specific theme overrides */
 .dark-mode .segmented-control{
   background: rgba(0, 0, 0, 0.2);
@@ -32,15 +24,6 @@
 :root.dark-mode .wt-input{
   background-color: #202020;
   color: #ededed;
-}
-
-:root.dark-mode .wt-chat-box{
-  scrollbar-color: var(--scrollbar-thumb-color) var(--scrollbar-track-background);
-}
-
-:root.dark-mode .wt-chat-box::-webkit-scrollbar-thumb{
-  background: var(--scrollbar-thumb-color);
-  border-color: var(--bg-body);
 }
 
 :root.dark-mode .wt-expand-btn{

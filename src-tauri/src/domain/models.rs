@@ -25,6 +25,21 @@ pub struct ClipboardEntry {
     pub file_preview_exists: bool, // Transient field: does the file exist on disk?
 }
 
+impl ClipboardEntry {
+    pub fn preserve_capture_metadata(&mut self, existing: &Self) {
+        self.is_pinned = existing.is_pinned;
+        self.pinned_order = existing.pinned_order;
+        self.use_count = existing.use_count;
+        let detected_tags = std::mem::take(&mut self.tags);
+        self.tags = existing.tags.clone();
+        for tag in detected_tags {
+            if !self.tags.contains(&tag) {
+                self.tags.push(tag);
+            }
+        }
+    }
+}
+
 fn default_true() -> bool {
     true
 }

@@ -17,19 +17,7 @@ pub struct DbState {
     pub tag_repo: SqliteTagRepository,
 }
 
-const SENSITIVE_KEYS: &[&str] = &[
-    "mqtt_password",
-    "mqtt_username",
-    "ai_profiles",
-    "cloud_sync_api_key",
-    "cloud_sync_webdav_password",
-];
-
 pub const SENSITIVE_TAGS: &[&str] = &["sensitive", "密码"];
-
-pub fn is_sensitive_key(key: &str) -> bool {
-    SENSITIVE_KEYS.iter().any(|k| k.eq_ignore_ascii_case(key))
-}
 
 pub fn has_sensitive_tag(tags: &[String]) -> bool {
     tags.iter()
@@ -304,194 +292,6 @@ pub fn seed_defaults(conn: &Connection) -> Result<()> {
         [],
     );
 
-    // File transfer settings
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('file_transfer_auto_close', 'false')",
-        [],
-    );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('file_transfer_auto_copy', 'false')",
-        [],
-    );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('file_server_enabled', 'false')",
-        [],
-    );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('file_server_port', '12345')",
-        [],
-    );
-
-    // MQTT settings
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('mqtt_port', '443')",
-        [],
-    );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('mqtt_enabled', 'false')",
-        [],
-    );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('mqtt_server', '')",
-        [],
-    );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('mqtt_username', '')",
-        [],
-    );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('mqtt_password', '')",
-        [],
-    );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('mqtt_topic', '')",
-        [],
-    );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('mqtt_protocol', 'wss://')",
-        [],
-    );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('mqtt_ssl', 'true')",
-        [],
-    );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('mqtt_client_id', '')",
-        [],
-    );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('mqtt_ws_path', '/mqtt')",
-        [],
-    );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('mqtt_notification_enabled', 'true')",
-        [],
-    );
-    let _ = conn.execute(
-        "UPDATE settings
-         SET value = ''
-         WHERE key = 'mqtt_server'
-           AND value = 'tiez.name666.top'
-           AND COALESCE((SELECT value FROM settings WHERE key = 'mqtt_enabled'), 'false') = 'false'",
-        [],
-    );
-    let _ = conn.execute(
-        "UPDATE settings
-         SET value = ''
-         WHERE key = 'mqtt_username'
-           AND value = 'tiezpublic'
-           AND COALESCE((SELECT value FROM settings WHERE key = 'mqtt_enabled'), 'false') = 'false'",
-        [],
-    );
-    let _ = conn.execute(
-        "UPDATE settings
-         SET value = ''
-         WHERE key = 'mqtt_password'
-           AND value = 'tiezmessage'
-           AND COALESCE((SELECT value FROM settings WHERE key = 'mqtt_enabled'), 'false') = 'false'",
-        [],
-    );
-
-    // Cloud sync settings
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('cloud_sync_enabled', 'false')",
-        [],
-    );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('cloud_sync_auto', 'true')",
-        [],
-    );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('cloud_sync_provider', 'webdav')",
-        [],
-    );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('cloud_sync_server', '')",
-        [],
-    );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('cloud_sync_api_key', '')",
-        [],
-    );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('cloud_sync_interval_sec', '120')",
-        [],
-    );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('cloud_sync_snapshot_interval_min', '720')",
-        [],
-    );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('cloud_sync_cursor', '0')",
-        [],
-    );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('cloud_sync_settings_applied_at', '0')",
-        [],
-    );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('cloud_sync_webdav_url', '')",
-        [],
-    );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('cloud_sync_webdav_username', '')",
-        [],
-    );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('cloud_sync_webdav_password', '')",
-        [],
-    );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('cloud_sync_webdav_base_path', 'tiez-sync')",
-        [],
-    );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('cloud_sync_content_prefs', '{\"text\":true,\"image\":true,\"file_path\":true,\"emoji\":true}')",
-        [],
-    );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('cloud_sync_webdav_local_seq', '0')",
-        [],
-    );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('cloud_sync_webdav_op_cursor_map', '{}')",
-        [],
-    );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('cloud_sync_webdav_blob_cache', '{}')",
-        [],
-    );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('cloud_sync_webdav_last_snapshot_push_at', '0')",
-        [],
-    );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('cloud_sync_webdav_last_snapshot_pull_at', '0')",
-        [],
-    );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('cloud_sync_webdav_last_head_rebuild_at', '0')",
-        [],
-    );
-
-    // AI settings
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('ai_enabled', 'false')",
-        [],
-    );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('ai_target_lang', 'zh')",
-        [],
-    );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('ai_enable_thinking', 'false')",
-        [],
-    );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('ai_thinking_budget', '1024')",
-        [],
-    );
-
     // Storage limit settings
     let _ = conn.execute(
         "INSERT OR IGNORE INTO settings (key, value) VALUES ('app.persistent_limit_enabled', 'true')",
@@ -558,24 +358,6 @@ mod tests {
             [],
         )
         .unwrap();
-        conn.execute(
-            "CREATE TABLE cloud_sync_tombstones (
-                content_type TEXT NOT NULL,
-                content_hash INTEGER NOT NULL,
-                deleted_at INTEGER NOT NULL,
-                PRIMARY KEY (content_type, content_hash)
-            )",
-            [],
-        )
-        .unwrap();
-        conn.execute(
-            "CREATE TABLE cloud_sync_local_index (
-                sync_key TEXT PRIMARY KEY,
-                digest TEXT NOT NULL
-            )",
-            [],
-        )
-        .unwrap();
         conn
     }
 
@@ -626,5 +408,69 @@ mod tests {
         // 测试设置读取
         let val = repo.get("test_key").unwrap();
         assert_eq!(val, Some("test_value".to_string()));
+    }
+
+    #[test]
+    fn recapture_preserves_tags_and_survives_history_limit() {
+        let conn = Arc::new(Mutex::new(setup_test_db()));
+        let repo = SqliteClipboardRepository::new(conn.clone());
+        let settings = SqliteSettingsRepository::new(conn.clone());
+        settings.set("app.persistent_limit", "0").unwrap();
+        let mut entry = ClipboardEntry {
+            id: 0, content_type: "text".into(), content: "saved snippet".into(),
+            html_content: None, source_app: "Test".into(), source_app_path: None,
+            timestamp: 1, preview: "saved snippet".into(), is_pinned: false,
+            tags: vec!["work".into(), "密码".into()], use_count: 0,
+            is_external: false, pinned_order: 0, file_preview_exists: true,
+        };
+        entry.id = repo.save(&entry, None).unwrap();
+        let mut captured = entry.clone();
+        captured.tags.clear();
+        captured.timestamp = 2;
+        let guard = conn.lock().unwrap();
+        repo.save_capture_with_conn(&guard, &mut captured, None).unwrap();
+        assert_eq!(captured.id, entry.id);
+        assert_eq!(captured.tags, entry.tags);
+        assert_eq!(captured.content, entry.content);
+        assert_eq!(captured.use_count, 1);
+        let indexed_tags: i64 = guard.query_row(
+            "SELECT COUNT(*) FROM entry_tags WHERE entry_id = ?", [entry.id], |r| r.get(0)
+        ).unwrap();
+        assert_eq!(indexed_tags, 2);
+        #[cfg(all(target_os = "windows", not(feature = "portable")))]
+        {
+            let raw: String = guard.query_row(
+                "SELECT content FROM clipboard_history WHERE id = ?", [entry.id], |r| r.get(0)
+            ).unwrap();
+            assert!(raw.starts_with(ENCRYPT_PREFIX), "Recapture must retain sensitive encryption");
+        }
+        assert!(repo.enforce_limit_with_conn(&guard, None).unwrap().is_empty());
+        assert!(repo.get_entry_by_id_with_conn(&guard, entry.id).unwrap().is_some());
+    }
+
+    #[test]
+    fn recapture_merges_detected_tags_and_preserves_pin_in_saved_and_emitted_entry() {
+        let conn = Arc::new(Mutex::new(setup_test_db()));
+        let repo = SqliteClipboardRepository::new(conn.clone());
+        let mut entry = ClipboardEntry {
+            id: 0, content_type: "text".into(), content: "pinned snippet".into(),
+            html_content: None, source_app: "Test".into(), source_app_path: None,
+            timestamp: 1, preview: "pinned snippet".into(), is_pinned: true,
+            tags: vec!["work".into()], use_count: 0,
+            is_external: false, pinned_order: 7, file_preview_exists: true,
+        };
+        entry.id = repo.save(&entry, None).unwrap();
+        let mut captured = entry.clone();
+        captured.is_pinned = false;
+        captured.pinned_order = 0;
+        captured.tags = vec!["sensitive".into()];
+        let guard = conn.lock().unwrap();
+        repo.save_capture_with_conn(&guard, &mut captured, None).unwrap();
+        assert!(captured.is_pinned);
+        assert_eq!(captured.pinned_order, 7);
+        assert_eq!(captured.tags, vec!["work", "sensitive"]);
+        let stored = repo.get_entry_by_id_with_conn(&guard, entry.id).unwrap().unwrap();
+        assert_eq!(stored.tags, captured.tags);
+        assert!(stored.is_pinned);
     }
 }

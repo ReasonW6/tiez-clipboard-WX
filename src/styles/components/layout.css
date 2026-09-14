@@ -90,14 +90,6 @@ header {
   box-shadow: 0 1px 4px rgba(15, 23, 42, 0.05);
 }
 
-.header-chat-btn {
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  flex: 0 0 30px;
-  box-sizing: border-box;
-}
-
 .search-container {
   position: relative;
   width: 100%;
@@ -163,11 +155,6 @@ select.search-input option {
   background: var(--bg-content);
   gap: 6px;
   width: 100%;
-}
-
-.main-content.main-content-chat-mode {
-  padding-bottom: 0;
-  gap: 0;
 }
 
 .virtual-list-wrapper {

@@ -18,6 +18,7 @@ import {
     normalizeThemeId
 } from "../../../shared/config/themes";
 import { getConciseTime } from "../../../shared/lib/utils";
+import { applyColorMode } from "../../../shared/lib/appearance";
 import type { Locale } from "../../../shared/types";
 import { toTauriLocalImageSrc } from "../../../shared/lib/localImageSrc";
 import { getRichTextSnapshotDataUrl } from "../../../shared/lib/richTextSnapshot";
@@ -134,15 +135,7 @@ const applyTheme = (payload: PreviewPayload) => {
 
     applyThemeClasses(theme, root, body);
 
-    root.classList.remove("light-mode", "dark-mode");
-    body.classList.remove("light-mode", "dark-mode");
-    if (colorMode === "dark") {
-        root.classList.add("dark-mode");
-        body.classList.add("dark-mode");
-    } else {
-        root.classList.add("light-mode");
-        body.classList.add("light-mode");
-    }
+    applyColorMode(colorMode);
 
     body.classList.add("compact-preview");
 

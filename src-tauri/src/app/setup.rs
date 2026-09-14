@@ -176,7 +176,6 @@ pub struct StartupSettings {
     pub capture_files: bool,
     pub capture_rich_text: bool,
     pub deduplicate: bool,
-    pub auto_copy_file: bool,
     pub silent_start: bool,
     pub delete_after_paste: bool,
     pub privacy_protection: bool,
@@ -198,15 +197,14 @@ pub struct StartupSettings {
     pub window_height: Option<u32>,
     pub main_hotkey: String,
     pub arrow_key_selection: bool,
-    pub auto_close_server: bool,
 }
 
 fn load_settings(repo: &impl SettingsRepository) -> StartupSettings {
     StartupSettings {
         theme: repo
             .get("app.theme")
-            .unwrap_or(Some("retro".to_string()))
-            .unwrap_or("retro".to_string()),
+            .unwrap_or(Some("mica".to_string()))
+            .unwrap_or("mica".to_string()),
         persistent: repo
             .get("app.persistent")
             .unwrap_or(Some("true".to_string()))
@@ -227,11 +225,6 @@ fn load_settings(repo: &impl SettingsRepository) -> StartupSettings {
             .unwrap_or(Some("true".to_string()))
             .map(|v| v == "true")
             .unwrap_or(true),
-        auto_copy_file: repo
-            .get("file_transfer_auto_copy")
-            .unwrap_or(Some("false".to_string()))
-            .map(|v| v == "true")
-            .unwrap_or(false),
         silent_start: repo
             .get("app.silent_start")
             .unwrap_or(Some("true".to_string()))
@@ -328,11 +321,6 @@ fn load_settings(repo: &impl SettingsRepository) -> StartupSettings {
             .unwrap_or(Some("false".to_string()))
             .map(|v| v == "true")
             .unwrap_or(false),
-        auto_close_server: repo
-            .get("file_transfer_auto_close")
-            .unwrap_or(Some("false".to_string()))
-            .map(|v| v == "true")
-            .unwrap_or(false),
     }
 }
 
@@ -355,11 +343,9 @@ fn setup_state(
     app.manage(SettingsState {
         deduplicate: AtomicBool::new(s.deduplicate),
         persistent: AtomicBool::new(s.persistent),
-        file_server_auto_close: AtomicBool::new(s.auto_close_server),
         theme: std::sync::Mutex::new(s.theme.clone()),
         capture_files: AtomicBool::new(s.capture_files),
         capture_rich_text: AtomicBool::new(s.capture_rich_text),
-        auto_copy_file: AtomicBool::new(s.auto_copy_file),
         silent_start: AtomicBool::new(s.silent_start),
         delete_after_paste: AtomicBool::new(s.delete_after_paste),
         privacy_protection: AtomicBool::new(s.privacy_protection),
@@ -395,22 +381,6 @@ fn setup_state(
         std::collections::VecDeque::new(),
     )));
     app.manage(AppDataDir(std::sync::Mutex::new(app_dir)));
-    app.manage(crate::services::file_transfer::ChatState::default());
-    app.manage(crate::services::file_transfer::SharedFileState(
-        std::sync::Mutex::new(std::collections::HashMap::new()),
-    ));
-    app.manage(crate::services::file_transfer::ServerInfo {
-        port: std::sync::atomic::AtomicU16::new(0),
-        ip: std::sync::Mutex::new(String::new()),
-    });
-    app.manage(crate::services::file_transfer::UploadSessions::default());
-    app.manage(crate::services::file_transfer::ServerActivityState::default());
-    app.manage(crate::services::file_transfer::WsBroadcaster(
-        std::sync::Mutex::new(None),
-    ));
-    app.manage(crate::services::file_transfer::OnlineDevices(
-        std::sync::Mutex::new(std::collections::HashMap::new()),
-    ));
     app.manage(PasteQueue::default());
 }
 
@@ -613,31 +583,9 @@ fn clamp_window_rect_to_monitor(rect: WindowRect, monitor: &tauri::Monitor) -> (
 fn start_services(app: &App, s: &StartupSettings, app_handle: AppHandle) {
     crate::infrastructure::windows_api::window_tracker::start_window_tracking(app_handle.clone());
     crate::services::clipboard::start_clipboard_monitor(app_handle.clone());
-    crate::services::mqtt_sub::start_mqtt_client(app_handle.clone());
-    crate::services::cloud_sync::start_cloud_sync_client(app_handle.clone());
     start_edge_docking_monitor(app_handle.clone());
 
     let db_state = app.state::<DbState>();
-    if db_state
-        .settings_repo
-        .get("file_server_enabled")
-        .unwrap_or(Some("false".to_string()))
-        == Some("true".to_string())
-    {
-        let port = db_state
-            .settings_repo
-            .get("file_server_port")
-            .unwrap_or(None)
-            .and_then(|x| x.parse::<u16>().ok());
-
-        let h = app_handle.clone();
-        tauri::async_runtime::spawn(async move {
-            let _ = crate::services::file_transfer::toggle_file_server(h, true, port).await;
-        });
-    }
-
-    // Daily app announcement ping
-    init_announcement_ping(app, &db_state.settings_repo);
 
     // Register active hotkeys based on current settings.
     let _ = crate::app::commands::register_hotkey(app_handle.clone(), s.main_hotkey.clone());
@@ -905,6 +853,8 @@ fn start_edge_docking_monitor(app_handle: AppHandle) {
                             _ => {}
                         }
                         IS_HIDDEN.store(true, Ordering::Relaxed);
+                        let _ = window.emit("main-window-hidden", ());
+                        let _ = app_handle.emit("force-hide-compact-preview", ());
                     }
                 } else if IS_HIDDEN.load(Ordering::Relaxed) {
                     IS_HIDDEN.store(false, Ordering::Relaxed);
@@ -953,44 +903,6 @@ fn start_edge_docking_monitor(app_handle: AppHandle) {
 #[cfg(not(target_os = "windows"))]
 fn start_edge_docking_monitor(_app_handle: AppHandle) {}
 
-fn init_announcement_ping(app: &App, repo: &impl SettingsRepository) {
-    let machine_id = crate::app::system::get_machine_id();
-    let stored_anon_id = repo.get("app.anon_id").unwrap_or(None);
-    let anon_id = stored_anon_id
-        .as_deref()
-        .and_then(crate::app::system::normalize_anon_id)
-        .unwrap_or_else(|| crate::app::system::build_anon_id(&machine_id));
-
-    if stored_anon_id
-        .as_deref()
-        .map(|value| value.trim() != anon_id)
-        .unwrap_or(true)
-    {
-        let _ = repo.set("app.anon_id", &anon_id);
-    }
-
-    let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
-    if repo.get("app.last_ping_date").unwrap_or(None).as_deref() != Some(&today) {
-        let _ = repo.set("app.last_ping_date", &today);
-        let version = app.package_info().version.to_string();
-        if let Ok(base_url) = std::env::var("TIEZ_ANNOUNCEMENT_PING_URL") {
-            let base_url = base_url.trim().to_string();
-            if !base_url.is_empty() {
-                std::thread::spawn(move || {
-                    let sep = if base_url.contains('?') { "&" } else { "?" };
-                    let ping_url = format!(
-                        "{}{}v={}&id={}",
-                        base_url,
-                        sep,
-                        urlencoding::encode(&version),
-                        urlencoding::encode(&anon_id)
-                    );
-                    let _ = reqwest::blocking::get(ping_url);
-                });
-            }
-        }
-    }
-}
 
 fn setup_tray(app: &App, hide_tray: bool) {
     use tauri::menu::{Menu, MenuItem};
@@ -1045,8 +957,8 @@ fn apply_initial_theme(app: &App) {
     let theme = db_state
         .settings_repo
         .get("app.theme")
-        .unwrap_or(Some("retro".to_string()))
-        .unwrap_or("retro".to_string());
+        .unwrap_or(Some("mica".to_string()))
+        .unwrap_or("mica".to_string());
     let mode = db_state
         .settings_repo
         .get("app.color_mode")
@@ -1217,9 +1129,7 @@ pub fn handle_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
                 return;
             }
             api.prevent_close();
-            let _ = window.hide();
-            NAVIGATION_ENABLED.store(false, Ordering::SeqCst);
-            NAVIGATION_MODE_ACTIVE.store(false, Ordering::SeqCst);
+            let _ = crate::app::window_manager::hide_main_window(window.app_handle());
         }
         _ => {}
     }
@@ -1322,8 +1232,7 @@ fn handle_blur(window: &tauri::Window) {
             };
         if !down && matches!(w.is_focused(), Ok(false)) {
             if !IGNORE_BLUR.load(Ordering::Relaxed) && !WINDOW_PINNED.load(Ordering::Relaxed) {
-                let _ = w.hide();
-                NAVIGATION_ENABLED.store(false, Ordering::SeqCst);
+                let _ = crate::app::window_manager::hide_main_window(w.app_handle());
                 release_win_keys();
                 let _ = restore_last_focus(w.app_handle().clone());
             }

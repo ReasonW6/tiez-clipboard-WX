@@ -104,7 +104,6 @@ body.theme-sticky-note {
   --scrollbar-thumb-color: rgba(122, 92, 80, 0.5);
   --scrollbar-thumb-hover-color: rgba(240, 167, 11, 0.8);
   --scrollbar-thumb-border: 2px solid transparent;
-  --scrollbar-chat-thumb-border: 2px solid rgba(255, 248, 201, 0.35);
 
   --content-font-family: var(--font-main);
   --content-line-height: 1.4;

@@ -7,9 +7,7 @@ interface UseSettingsSyncOptions {
   saveAppSetting: (type: string, value: string) => void;
   captureFiles: boolean;
   captureRichText: boolean;
-  fileTransferAutoCopy: boolean;
-  fileServerAutoClose: boolean;
-  fileTransferAutoOpen: boolean;
+
   persistent: boolean;
   soundVolume: number;
   arrowKeySelection: boolean;
@@ -23,9 +21,6 @@ export const useSettingsSync = ({
   saveAppSetting,
   captureFiles,
   captureRichText,
-  fileTransferAutoCopy,
-  fileServerAutoClose,
-  fileTransferAutoOpen,
   persistent,
   soundVolume,
   arrowKeySelection,
@@ -50,24 +45,6 @@ export const useSettingsSync = ({
       invoke("set_capture_rich_text", { enabled: captureRichText });
     }
   }, [captureRichText, settingsLoaded]);
-
-  useEffect(() => {
-    if (settingsLoaded) {
-      invoke("set_auto_copy_file", { enabled: fileTransferAutoCopy });
-    }
-  }, [fileTransferAutoCopy, settingsLoaded]);
-
-  useEffect(() => {
-    if (settingsLoaded) {
-      invoke("set_file_server_auto_close", { enabled: fileServerAutoClose }).catch(console.error);
-    }
-  }, [fileServerAutoClose, settingsLoaded]);
-
-  useEffect(() => {
-    if (settingsLoaded) {
-      invoke("set_file_transfer_auto_open", { enabled: fileTransferAutoOpen }).catch(console.error);
-    }
-  }, [fileTransferAutoOpen, settingsLoaded]);
 
   useEffect(() => {
     if (settingsLoaded) {

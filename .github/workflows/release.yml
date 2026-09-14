@@ -1,70 +1,62 @@
-name: "Publish Release"
+name: Publish Windows Release
 
 on:
   push:
     tags:
       - 'v*'
-  workflow_dispatch: # 添加这一行，启用手动触发
+  workflow_dispatch:
 
 jobs:
-  publish-tauri:
+  publish:
+    runs-on: windows-latest
     permissions:
       contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: 'windows-latest' 
-            args: ''
-
-    runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v5
-
-      - name: setup node
-        uses: actions/setup-node@v5
+      - uses: actions/setup-node@v5
         with:
-          node-version: lts/*
-
-      - name: install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+          node-version: 24
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-pc-windows-msvc
-
-      - name: install dependencies (ubuntu only)
-        if: matrix.platform == 'ubuntu-22.04'
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Test frontend
+        run: npm test
+      - name: Test Rust
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --bin tiez-app
+      - name: Verify signing configuration
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libnm-dev libayatana-appindicator3-dev librsvg2-dev patchelf
-
-      - name: install frontend dependencies
-        run: npm install
-
+          if (-not $env:TAURI_SIGNING_PRIVATE_KEY) {
+            throw 'Configure TAURI_SIGNING_PRIVATE_KEY using the key matching src-tauri/tauri.conf.json. See docs/RELEASING.md.'
+          }
       - uses: tauri-apps/tauri-action@v0
+        id: release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: v__VERSION__ 
-          releaseName: "TieZ v__VERSION__"
-          releaseBody: "建议更新新版本"
+          tagName: v__VERSION__
+          releaseName: TieZ v__VERSION__
+          releaseBody: Windows local clipboard edition.
           releaseDraft: true
           prerelease: false
-          args: ${{ matrix.args }}
-
-      - name: build portable bundle
-        if: startsWith(github.ref, 'refs/tags/v')
-        shell: powershell
-        run: npm run build:portable
-
-      - name: upload portable bundle
-        if: startsWith(github.ref, 'refs/tags/v')
-        shell: powershell
+          includeUpdaterJson: true
+          updaterJsonPreferNsis: true
+          args: --config src-tauri/tauri.release.conf.json --bundles nsis
+      - name: Package portable archive
+        shell: pwsh
+        run: ./scripts/build-portable.ps1 -SkipBuild
+      - name: Upload portable archive
+        shell: pwsh
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $version = (Get-Content package.json | ConvertFrom-Json).version
-          $portable = 'artifacts/portable/tiez-portable.zip'
-          $assetName = "TieZ_${version}_x64_portable.zip"
-          gh release upload "v$version" "$portable#$assetName" --repo $env:GITHUB_REPOSITORY --clobber
+          $assetName = 'TieZ_{0}_x64_portable.zip' -f $version
+          gh release upload "v$version" "artifacts/portable/tiez-portable.zip#$assetName" --repo $env:GITHUB_REPOSITORY --clobber

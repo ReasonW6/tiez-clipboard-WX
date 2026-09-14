@@ -33,7 +33,7 @@ const UpdateDialog: React.FC<UpdateDialogProps> = ({
   }, [isOpen]);
 
   const handleOpenWebsite = () => {
-    openUrl("https://tiez.name666.top/");
+    openUrl("https://github.com/ReasonW6/tiez-clipboard-WX/releases");
   };
 
   return (
@@ -65,7 +65,7 @@ const UpdateDialog: React.FC<UpdateDialogProps> = ({
               <div className="update-notes-container custom-scrollbar">
                 <p className="update-notes-text">
                   {status === "error" 
-                    ? "更新过程中遇到了错误。这可能是由于网络原因或系统权限导致，请尝试前往官网手动下载最新版本。"
+                    ? "更新过程中遇到了错误。这可能是由于网络原因或系统权限导致，请尝试前往发行页面手动下载最新版本。"
                     : (notes || "在这个版本中，我们带来了一些性能优化和体验改进。")}
                 </p>
               </div>
@@ -104,7 +104,7 @@ const UpdateDialog: React.FC<UpdateDialogProps> = ({
                     className="update-btn"
                   >
                     <ExternalLink size={16} />
-                    前往官网
+                    前往发行页面
                   </button>
                 ) : status === "ready" ? (
                   <button

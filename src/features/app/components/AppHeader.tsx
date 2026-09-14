@@ -2,7 +2,6 @@ import type { RefObject } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ChevronLeft,
-  MessageSquare,
   Pin,
   PinOff,
   Search,
@@ -25,8 +24,7 @@ interface AppHeaderProps {
   showEmojiPanel: boolean;
   setShowEmojiPanel: (val: boolean) => void;
   emojiPanelEnabled: boolean;
-  chatMode: boolean;
-  fileServerEnabled: boolean;
+
   isWindowPinned: boolean;
   setIsWindowPinned: (val: boolean) => void;
   clearHistory: () => void;
@@ -47,7 +45,7 @@ interface AppHeaderProps {
   typeFilter: string | null;
   setTypeFilter: (val: string | null) => void;
   onBack: () => void;
-  onToggleChat: () => void;
+
 }
 
 const AppHeader = ({
@@ -60,8 +58,6 @@ const AppHeader = ({
   showEmojiPanel,
   setShowEmojiPanel,
   emojiPanelEnabled,
-  chatMode,
-  fileServerEnabled,
   isWindowPinned,
   setIsWindowPinned,
   clearHistory,
@@ -81,8 +77,7 @@ const AppHeader = ({
   settingsTitle,
   typeFilter,
   setTypeFilter,
-  onBack,
-  onToggleChat
+  onBack
 }: AppHeaderProps) => {
   const getTypeName = (type: string) => {
     switch (type) {
@@ -152,15 +147,7 @@ const AppHeader = ({
             </button>
           </>
         )}
-        {fileServerEnabled && (
-          <button
-            className={`btn-icon header-chat-btn ${chatMode && showSettings ? 'active' : ''}`}
-            title="Chat"
-            onClick={onToggleChat}
-          >
-            <MessageSquare size={16} />
-          </button>
-        )}
+
         <button className="btn-icon" title={t('hide')} onClick={async () => {
           invoke("hide_window_cmd").catch(console.error);
         }}>

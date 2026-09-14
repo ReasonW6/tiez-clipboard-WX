@@ -1,0 +1,54 @@
+/* Inspired by Apple HIG Materials: glass belongs to controls and navigation.
+   The desktop backdrop is provided by Windows; CSS filters blur in-window content. */
+:root.theme-liquid-glass, body.theme-liquid-glass {
+  --bg-window: rgba(239,244,251,calc(.06 + var(--surface-opacity,.5) * .66));
+  --bg-panel: rgba(255,255,255,.48);
+  --bg-input: rgba(255,255,255,.44);
+  --bg-element: rgba(255,255,255,.52);
+  --bg-button: rgba(255,255,255,.3);
+  --glass-fill: rgba(255,255,255,calc(.12 + var(--surface-opacity,.5) * .5));
+  --glass-edge: rgba(255,255,255,.8);
+  --glass-shade: rgba(56,82,112,.13);
+  --glass-glint: rgba(255,255,255,.65);
+  --glass-filter: blur(var(--glass-blur,18px)) saturate(155%);
+  --shell-radius: 18px;
+  --button-radius: 999px;
+  --input-radius: 18px;
+  --panel-radius: 16px;
+  --card-radius: 14px;
+  --shell-shadow: inset 0 1px 0 rgba(255,255,255,.6), inset 0 -1px 0 rgba(80,110,145,.1);
+  --card-shadow: 0 2px 7px rgba(40,64,90,.035);
+}
+:root.theme-liquid-glass.dark-mode, body.theme-liquid-glass.dark-mode {
+  --bg-window: rgba(18,28,44,calc(.12 + var(--surface-opacity,.5) * .72));
+  --bg-panel: rgba(53,66,87,.53);
+  --bg-input: rgba(215,232,255,.1);
+  --bg-element: rgba(51,65,88,.52);
+  --bg-button: rgba(215,232,255,.09);
+  --glass-fill: rgba(49,65,88,calc(.22 + var(--surface-opacity,.5) * .54));
+  --glass-edge: rgba(215,237,255,.3);
+  --glass-shade: rgba(0,0,0,.28);
+  --glass-glint: rgba(210,237,255,.14);
+  --shell-shadow: inset 0 1px 0 rgba(222,240,255,.22), inset 0 -1px 0 rgba(0,0,0,.18);
+}
+body.theme-liquid-glass :is(.header-actions, .tm-view-toggle, .tm-search, .search-input, .tm-batch-bar, .queue-bar) {
+  background: linear-gradient(145deg, var(--glass-glint), transparent 35%, transparent 70%, var(--glass-glint)), var(--glass-fill);
+  border: 1px solid var(--glass-edge);
+  box-shadow: inset 0 1px 1px var(--glass-glint), inset 0 -1px 1px var(--glass-shade), 0 4px 14px var(--glass-shade);
+  backdrop-filter: var(--glass-filter);
+  -webkit-backdrop-filter: var(--glass-filter);
+}
+body.theme-liquid-glass .header-actions { border-radius: 999px; padding: 3px; gap: 2px; }
+body.theme-liquid-glass .header-actions .btn-icon { border: 0; box-shadow: none; background: transparent; border-radius: 50%; }
+body.theme-liquid-glass .header-actions .btn-icon:hover { background: var(--bg-input); }
+body.theme-liquid-glass .header-actions .btn-icon.active { background: var(--accent-color); color: var(--button-active-filled-color); }
+body.theme-liquid-glass .tm-tag.active { background: var(--glass-fill); border-color: var(--glass-edge); box-shadow: inset 0 1px 0 var(--glass-glint), 0 2px 7px var(--glass-shade); color: var(--accent-color); backdrop-filter: var(--glass-filter); }
+body.theme-liquid-glass .tm-batch-bar { border-radius: 18px; padding: 9px; margin-top: 4px; }
+body.theme-liquid-glass .tm-view-toggle { border-radius: 999px; }
+body.theme-liquid-glass .tm-view-toggle .tm-icon { border-radius: 999px; }
+body.theme-liquid-glass :is(.tm-primary, .btn-icon.active) { box-shadow: inset 0 1px 0 rgba(255,255,255,.24), 0 3px 10px rgba(var(--accent-color-rgb),.2); }
+body.theme-liquid-glass :is(.tm-button, .tm-icon, .btn-icon) { transition: background .18s ease, box-shadow .18s ease, transform .2s cubic-bezier(.2,.8,.2,1); }
+body.theme-liquid-glass :is(.tm-button, .tm-icon, .btn-icon):active { transform: scale(.96); }
+@media (prefers-reduced-motion: reduce) {
+  body.theme-liquid-glass :is(.tm-button, .tm-icon, .btn-icon) { transition: none; transform: none; }
+}
