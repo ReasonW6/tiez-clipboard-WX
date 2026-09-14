@@ -3,3 +3,6 @@ pub mod hooks;
 pub mod setup;
 pub mod system;
 pub mod window_manager;
+
+#[cfg(test)]
+mod permissions_tests;

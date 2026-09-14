@@ -29,7 +29,7 @@ npm run release
 4. 工作流运行测试、构建 NSIS 安装包、生成签名及 `latest.json`，并把安装包和便携包放入发行草稿。
 5. 检查草稿附件，确认存在安装包、签名和 `latest.json`，再发布为正式发行版。草稿和预发行版本不会成为当前配置的 `latest` 更新源。
 
-更新清单中的下载地址由 `tauri-action` 根据当前 fork 和版本标签生成。签名私钥需与客户端内置公钥配对。本次代码修改没有上传私钥、创建远端 secret、推送代码或发布发行版。
+更新清单中的下载地址由 `tauri-action` 根据当前 fork 和版本标签生成。签名私钥需与客户端内置公钥配对。私钥和 Actions secrets 不包含在源码提交中；本地构建不会自动发布发行版。
 
 实现依据见 [Tauri 更新插件文档](https://v2.tauri.app/plugin/updater/) 和 [tauri-action v0 配置](https://github.com/tauri-apps/tauri-action/blob/v0/action.yml)。
 

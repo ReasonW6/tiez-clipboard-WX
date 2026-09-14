@@ -186,7 +186,7 @@ export default function TagManager({ t, theme }: TagManagerProps) {
       </div>
       <div className="tm-search">
         <Search size={15} aria-hidden="true" />
-        <input aria-label={t("find_or_create")} placeholder={t("find_or_create")} value={tagSearch} onFocus={focusWindow}
+        <input aria-label={t("find_or_create")} placeholder={t("find_or_create")} value={tagSearch} onMouseDown={focusWindow} onFocus={focusWindow}
           onChange={event => setTagSearch(event.target.value)} onKeyDown={event => {
             if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
             const exact = tags.find(tag => tag.name.toLowerCase() === search);
@@ -211,7 +211,7 @@ export default function TagManager({ t, theme }: TagManagerProps) {
         <div className="tm-current-tag">
           {selectedTag && <label className="tm-color-control" title={t("tm_tag_color")}>
             <span className="tm-dot" style={{ background: tagColors[selectedTag] || getTagColor(selectedTag, theme) }} />
-            <input type="color" aria-label={t("tm_tag_color")} value={tagColors[selectedTag] || "#4d7ce8"} disabled={busy}
+            <input type="color" onMouseDown={focusWindow} aria-label={t("tm_tag_color")} value={tagColors[selectedTag] || "#4d7ce8"} disabled={busy}
               onChange={event => {
                 const name = selectedTag, color = event.target.value;
                 setTagColors(previous => ({ ...previous, [name]: color }));
@@ -227,7 +227,7 @@ export default function TagManager({ t, theme }: TagManagerProps) {
         {selectedTag && <button className="tm-button tm-primary tm-add" onClick={() => openDialog({ kind: "create-item", tag: selectedTag })}><Plus size={15} />{t("add_item")}</button>}
       </div>
       {selectedTag && <div className="tm-toolbar">
-        <label className="tm-sort"><ArrowUpDown size={13} /><select aria-label={t("tm_sort")} value={sortBy} onChange={event => setSortBy(event.target.value)}>
+        <label className="tm-sort"><ArrowUpDown size={13} /><select onMouseDown={focusWindow} aria-label={t("tm_sort")} value={sortBy} onChange={event => setSortBy(event.target.value)}>
           <option value="time">{t("sort_time")}</option><option value="count">{t("sort_usage")}</option>
         </select></label>
         <div className="tm-toolbar-end">
@@ -288,8 +288,8 @@ export default function TagManager({ t, theme }: TagManagerProps) {
         <h3 id="tm-dialog-title">{dialogTitle}</h3>
         {deleting ? <p>{dialog.kind === "delete-tag" ? t("confirm_delete_tag") : t("confirm_delete_desc")}
           {dialog.kind === "delete-tag" && <strong className="tm-delete-name">{dialog.tag}</strong>}
-        </p> : dialog.kind === "create-item" || dialog.kind === "edit-item" ? <textarea aria-label={t("input_content_placeholder")} placeholder={t("input_content_placeholder")} value={draft} onChange={event => setDraft(event.target.value)} onFocus={focusWindow} autoFocus required />
-          : <input aria-label={t("tags")} value={draft} onChange={event => setDraft(event.target.value)} onFocus={focusWindow} autoFocus required />}
+        </p> : dialog.kind === "create-item" || dialog.kind === "edit-item" ? <textarea aria-label={t("input_content_placeholder")} placeholder={t("input_content_placeholder")} value={draft} onChange={event => setDraft(event.target.value)} onMouseDown={focusWindow} onFocus={focusWindow} autoFocus required />
+          : <input aria-label={t("tags")} value={draft} onChange={event => setDraft(event.target.value)} onMouseDown={focusWindow} onFocus={focusWindow} autoFocus required />}
         {error && <p role="alert" className="tm-danger">{t("tm_action_failed")} {error}</p>}
         <div className="tm-dialog-actions"><button type="button" className="tm-button" disabled={busy} onClick={() => setDialog(null)}>{t("cancel")}</button>
           <button type="submit" className={`tm-button ${deleting ? "tm-danger" : "tm-primary"}`} disabled={busy || (!deleting && !draft.trim())}>{t(busy ? "processing" : deleting ? "delete" : "save")}</button>

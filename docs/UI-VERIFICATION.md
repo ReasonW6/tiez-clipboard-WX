@@ -11,16 +11,22 @@
 
 ## 自动检查
 
-本次执行结果：22 项前端测试、65 项 Rust 测试、26 项浏览器回归通过，TypeScript 与 Vite 生产构建通过。Rust 最终全量测试使用正常 Windows 用户凭据验证 DPAPI。
+本次执行结果：22 项前端测试、70 项 Rust 测试、29 项浏览器回归通过，TypeScript 与 Vite 生产构建通过。Rust 最终全量测试使用正常 Windows 用户凭据验证 DPAPI。
 
 - `npm test`：前端单元测试及设置页渲染。
-- `npm run test:ui`：Playwright 浏览器回归。覆盖全部七款主题与相反系统明暗、快速切换、关闭重置、固定窗口失焦、320/425/780px 标签布局、响应乱序、失败时保留内容、粘贴参数、编辑/删除命中区域、长文本与设置重载。
+- `npm run test:ui`：Playwright 浏览器回归。覆盖全部七款主题与相反系统明暗、快速切换、关闭重置、固定窗口失焦、250/320/352/425/780px 标签布局、响应乱序、失败时保留内容、粘贴参数、编辑/删除命中区域、长文本与设置重载。
 - `cargo test --offline --manifest-path src-tauri/Cargo.toml --bin tiez-app`：Rust 回归，包含真实内存 SQLite 中的去重、标签索引、容量清理及 DPAPI 密文检查。Windows DPAPI 检查需要有效用户凭据，受限沙盒账户可能无法执行；请在正常 Windows 用户会话运行。
 - `npm run build`：TypeScript 与 Vite 生产构建。
 
 首次运行浏览器测试需要 `npx playwright install chromium`。也可通过 `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` 指定已有的 Chromium。测试页面仅存在于 tests/ui/harness.html，不会进入 Vite 正式构建入口。所有 Tauri 调用都被拦截，只使用虚构数据，不访问真实剪贴板、文件或数据库。
 
-本次本地发行构建已生成 NSIS 安装包、更新签名与便携 ZIP。安装包使用配置中的公钥验证通过，篡改单字节的副本被拒绝；便携 ZIP 内的 TieZ.exe 与本次发行程序哈希相同，且只包含程序、空 data 目录、许可证和使用说明。哈希记录位于 artifacts/build-verification.json，界面对比预览位于 artifacts/ui-preview/index.html。
+本地发行构建和签名校验的结果记录在 artifacts/build-verification.json，界面对比预览位于 artifacts/ui-preview/index.html。源码提交或合并不会自动更新已有安装包；需要重新运行 npm run release 和 npm run build:portable 后，再验证签名及便携包内程序的一致性。
+
+## 合并前审查补充
+
+- 通过 Tauri MockRuntime 和正式配置复现了 `window.theme` 与 `event.emit_to` 的权限拒绝；补齐主题查询和预览通信权限后通过，同时验证未列出的窗口仍被拒绝。测试不会启动原生 WebView2。
+- 启动时为实际数据目录中的 attachments 和 emoji_favorites 恢复资源访问权限，并恢复用户选定背景文件的单文件权限。使用 Tauri 实际路径匹配器验证便携路径、目录名中的方括号、背景路径恢复及数据库访问隔离。
+- 标签输入框在鼠标按下时重新激活原生窗口，避免 DOM 焦点未变化时无法重新获取键盘输入。浏览器回归确认不会连带触发粘贴；新增最小尺寸与默认尺寸的布局检查。
 
 ## 材质边界与人工检查
 

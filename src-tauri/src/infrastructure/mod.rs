@@ -1,4 +1,5 @@
 pub mod encryption;
+pub mod asset_scope;
 pub mod repository;
 #[cfg(target_os = "windows")]
 pub mod windows_ext;

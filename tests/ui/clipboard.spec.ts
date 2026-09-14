@@ -85,9 +85,9 @@ test("hide resets settings, tag dialogs, search and selection; blur alone preser
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
-for (const width of [320, 425, 780]) {
+for (const width of [250, 320, 352, 425, 780]) {
   test(`tag layout keeps controls and counts usable at ${width}px`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 589 });
+    await page.setViewportSize({ width, height: width === 250 ? 300 : width === 352 ? 380 : 589 });
     await start(page);
     await openTags(page);
     const geometry = await page.evaluate(() => {
@@ -232,4 +232,16 @@ test("editing and bulk pasting use full content rather than a truncated tag prev
   await page.locator(".tm-batch-bar").getByRole("button", { name: "粘贴", exact: true }).click();
   const calls = await commandCalls(page, "copy_to_clipboard");
   expect(calls.at(-1).args).toMatchObject({ id: 0, deleteAfterUse: false, content });
+});
+
+
+test("tag inputs reactivate the native window even when DOM focus is unchanged", async ({ page }) => {
+  await start(page);
+  await openTags(page);
+  const input = page.getByRole("textbox", { name: "查找或创建...", exact: true });
+  await input.focus();
+  const before = (await commandCalls(page, "activate_window_focus")).length;
+  await input.dispatchEvent("mousedown");
+  await expect.poll(async () => (await commandCalls(page, "activate_window_focus")).length).toBe(before + 1);
+  expect(await commandCalls(page, "copy_to_clipboard")).toHaveLength(0);
 });

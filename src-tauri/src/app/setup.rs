@@ -69,6 +69,12 @@ pub fn init(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     })?;
     let conn_arc = std::sync::Arc::new(std::sync::Mutex::new(conn));
     let settings_repo = SqliteSettingsRepository::new(conn_arc.clone());
+    let custom_background = settings_repo.get("app.custom_background")?;
+    crate::infrastructure::asset_scope::allow_persisted_media(
+        &app.asset_protocol_scope(),
+        &app_dir,
+        custom_background.as_deref(),
+    )?;
 
     // 4. Initial Settings & Reset Safety
     apply_startup_resets(&settings_repo);
