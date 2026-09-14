@@ -8,11 +8,11 @@
 <div align="center">
   <img src="docs/images/logo.png" alt="TieZ Hero Logo" width="300" />
 
-  ### **STAY FAST. STAY SYNCED.**
+  ### **STAY FAST. STAY LOCAL.**
 
   | STARS | VERSION | LICENSE | PLATFORM |
   | :--- | :--- | :--- | :--- |
-  | [![Stars](https://img.shields.io/github/stars/jimuzhe/tiez-clipboard?label=STARS&style=for-the-badge&color=4CAF50)](https://github.com/jimuzhe/tiez-clipboard/stargazers) | [![Version](https://img.shields.io/github/v/release/jimuzhe/tiez-clipboard?label=VERSION&style=for-the-badge&color=2196F3)](https://github.com/jimuzhe/tiez-clipboard/releases) | [![License](https://img.shields.io/badge/LICENSE-GPL--3.0-FF9800?style=for-the-badge)](https://www.gnu.org/licenses/gpl-3.0) | [![Platform](https://img.shields.io/badge/PLATFORM-WIN%20%2F%20MAC-f44336?style=for-the-badge)](https://github.com/jimuzhe/tiez-clipboard/releases) |
+  | [![Stars](https://img.shields.io/github/stars/ReasonW6/tiez-clipboard-WX?label=STARS&style=for-the-badge&color=4CAF50)](https://github.com/ReasonW6/tiez-clipboard-WX/stargazers) | [![Version](https://img.shields.io/github/v/release/ReasonW6/tiez-clipboard-WX?label=VERSION&style=for-the-badge&color=2196F3)](https://github.com/ReasonW6/tiez-clipboard-WX/releases) | [![License](https://img.shields.io/badge/LICENSE-GPL--3.0-FF9800?style=for-the-badge)](https://www.gnu.org/licenses/gpl-3.0) | [![Platform](https://img.shields.io/badge/PLATFORM-WINDOWS%20x64-f44336?style=for-the-badge)](https://github.com/ReasonW6/tiez-clipboard-WX/releases) |
 
   [English](./README.md) | [简体中文](./README.zh-CN.md)
 </div>
@@ -23,7 +23,7 @@
 
 ## Theme Gallery
 
-Explore 4 elegant themes designed for every workspace and efficiency scenarios.
+Explore 7 built-in themes designed for different workspaces and workflows.
 
   <table>
     <tr>
@@ -33,41 +33,46 @@ Explore 4 elegant themes designed for every workspace and efficiency scenarios.
       <td align="center"><b>3D Interaction</b><br><img src="docs/images/3d.png" width="220" /></td>
     </tr>
   </table>
+  <table>
+    <tr>
+      <td align="center"><b>Mica</b><br><img src="docs/images/mica.png" width="220" /></td>
+      <td align="center"><b>Liquid Glass</b><br><img src="docs/images/liquid-glass.png" width="220" /></td>
+      <td align="center"><b>Sakura</b><br><img src="docs/images/sakura.png" width="220" /></td>
+    </tr>
+  </table>
 </div>
 
 ---
 
 ## Why TieZ?
 
-| Performance | Practicality | Privacy | Sync |
+| Performance | Practicality | Privacy | Appearance |
 | :--- | :--- | :--- | :--- |
-| **Instant Access**<br>Native listeners and Rust core ensure absolute speed. | **Power Workflows**<br>Rich text, tags, and AI-assisted actions. | **Local & Private**<br>Local-first storage with smart masking for sensitive data in previews. | **Cloud Fluent**<br>Seamless WebDAV and MQTT cross-device sync. |
+| **Instant Access**<br>Native listeners and a Rust core for quick access to your clipboard. | **Power Workflows**<br>Rich text, multi-color tags, search, and sequential paste. | **Local & Private**<br>Local history storage with masking for sensitive data in previews. | **Make It Yours**<br>Seven built-in themes, light and dark modes, and adjustable Liquid Glass effects. |
 
 ---
 
 ## Key Features
 
 ### Core Experience
+
 - **Native Efficiency**: Built with Tauri 2 and Rust for minimum memory footprint.
 - **Smart Capture**: Automatically collects text, rich text (HTML), images, and file paths.
-- **Modern UI**: Supports Mica/Acrylic effects and Dark/Light modes with **4 elegant theme styles**.
+- **Modern UI**: **7 built-in themes**, including refreshed Mica/Acrylic effects and Liquid Glass, with light and dark modes.
+- **Liquid Glass Controls**: Adjust clarity (0–100%) and control backdrop blur (0–32px) in Appearance settings.
 - **Edge Docking**: Automatically hides at the screen edge to stay out of your way.
 
 ### Management & Enhancements
+
 - **Tag System**: Organize your history with custom multi-color tags.
 - **Emoji Library**: Comprehensive built-in emoji management for quick access.
 - **Advanced Settings**: Granular control over cleanup rules and app behavior.
 - **Privacy Masking**: Auto-masks sensitive info like IDs and phone numbers in previews.
 
-### Networking & Transport
-- **WebDAV Sync**: Your data, your cloud. Complete cross-device history.
-- **LAN File Transfer**: Seamlessly move items between devices on the same network.
-- **Verifcation Code Sync**: Instant transfer of OTP codes to your active device.
-- **MQTT Connectivity**: Optimized for real-time synchronization between devices.
-
 ### Productivity Tools
-- **External Collaboration**: Open items in external editors with auto-sync back.
-- **Global Search**: Find anything by content, source app, or date.
+
+- **External Editing**: Open items in external editors and save changes back to local history.
+- **Global Search**: Find records by content, source app, or tag.
 - **Sequential Paste**: Optimized workflow for high-frequency copy-paste tasks.
 
 ---
@@ -75,51 +80,20 @@ Explore 4 elegant themes designed for every workspace and efficiency scenarios.
 ## Installation
 
 ### Platform Support
+
 | Platform | Requirement | Output |
 | :--- | :--- | :--- |
-| **Windows** | Windows 10/11 (x86/x64)<br>*(Windows 11 Recommended)* | `.exe` / **`.zip` (Portable)** |
-| **macOS** | Sierra 10.15+ <br>(Apple Silicon / Intel) | `.dmg` |
-| **Linux** | Support Coming Soon | TBD |
+| **Windows** | Windows 10/11 (x64)<br>*(Windows 11 Recommended)* | `.exe` / **`.zip` (Portable)** |
 
-[**Download the Latest Release →**](https://github.com/jimuzhe/tiez-clipboard/releases)
+[**View This Fork's Releases →**](https://github.com/ReasonW6/tiez-clipboard-WX/releases)
 
----
-
-## Star History
-
-<div align="center">
-  <a href="https://star-history.com/#jimuzhe/tiez-clipboard&Date">
-    <img src="https://api.star-history.com/svg?repos=jimuzhe/tiez-clipboard&type=Date" alt="Star History Chart" width="800" />
-  </a>
-</div>
+The built-in update checker uses this fork's releases.
 
 ---
 
-## Community & Support
+## Original Project
 
-If TieZ makes your life easier, consider supporting the journey.
-
-<div align="center">
-  <table style="border: none;">
-    <tr>
-      <td align="center" style="border: none;">
-        <p><strong>WeChat</strong></p>
-        <img src="docs/images/wx.jpeg" alt="WeChat" width="180" height="180" />
-      </td>
-      <td align="center" style="border: none;">
-        <p><strong>Alipay</strong></p>
-        <img src="docs/images/zfb.jpeg" alt="Alipay" width="180" height="180" />
-      </td>
-      <td align="center" style="border: none;">
-        <p><strong>QQ Group</strong></p>
-        <img src="docs/images/qq.jpeg" alt="QQ Group" width="180" height="180" />
-      </td>
-    </tr>
-  </table>
-  <br>
-  <p>Your support keeps the project active and the developer caffeinated!</p>
-  <a href="https://tiez.name666.top/zh/sponsors.html"><strong>View Sponsor List</strong></a>
-</div>
+This fork is based on [TieZ · jimuzhe/tiez-clipboard](https://github.com/jimuzhe/tiez-clipboard). Thanks to the original author and contributors.
 
 ---
 
