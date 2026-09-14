@@ -978,6 +978,7 @@ fn apply_initial_theme(app: &App) {
             theme,
             mode,
             None,
+            None,
         );
     }
 }

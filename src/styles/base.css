@@ -38,6 +38,7 @@
   --spacing-md: 16px;
   --spacing-sm: 8px;
   --surface-opacity-scale: 1;
+  --surface-fill: 0.319;
 
   --font-main: "Segoe UI", "Inter", "Microsoft YaHei", sans-serif;
   --font-mono: "Cascadia Code", "Consolas", monospace;
@@ -343,4 +344,21 @@ body.hide-app-border #root {
   overflow: hidden;
   -webkit-clip-path: inset(0 round var(--shell-radius));
   clip-path: inset(0 round var(--shell-radius));
+}
+
+/* DWM clips the complete Win11 window, including its native backdrop. Filling
+   that rectangle avoids exposing crescents between two different corner radii. */
+:root.native-window-frame:is(.theme-mica, .theme-acrylic, .theme-liquid-glass, .theme-sakura),
+body.native-window-frame:is(.theme-mica, .theme-acrylic, .theme-liquid-glass, .theme-sakura) {
+  --shell-radius: 0px !important;
+}
+body.native-window-frame:is(.theme-mica, .theme-acrylic, .theme-liquid-glass, .theme-sakura) #root { border: 0; }
+body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass, .theme-sakura) .app-container {
+  border-radius: max(0px, calc(var(--shell-radius) - 1px));
+  -webkit-clip-path: none;
+  clip-path: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; }
 }

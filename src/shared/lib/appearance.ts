@@ -8,15 +8,31 @@ export const applyColorMode = (mode: "light" | "dark") => {
   document.documentElement.style.colorScheme = mode;
 };
 
-export const clampGlassBlur = (value: number) => Number.isFinite(value)
-  ? Math.min(32, Math.max(0, value)) : 18;
+export const MAX_GLASS_BLUR = 64;
+export const clampSurfaceOpacity = (value: number) => Number.isFinite(value)
+  ? Math.min(100, Math.max(0, value)) : 50;
 
-export const applySurfaceSettings = (opacity: number, blur: number) => {
-  const safeOpacity = Number.isFinite(opacity) ? Math.min(100, Math.max(0, opacity)) : 50;
+export const nativeBackdropEnabled = (opacity: number) => clampSurfaceOpacity(opacity) > 0;
+
+// One persisted value controls the entire material, including on reload.
+export const getLiquidGlassMaterial = (opacity: number) => {
+  const density = clampSurfaceOpacity(opacity) / 100;
+  return {
+    blur: Number((MAX_GLASS_BLUR * Math.pow(density, 1.85)).toFixed(2)),
+    specular: .85 - density * .45,
+    refraction: 24 - density * 18
+  };
+};
+
+export const applySurfaceSettings = (opacity: number) => {
+  const safeOpacity = clampSurfaceOpacity(opacity);
+  const material = getLiquidGlassMaterial(safeOpacity);
   const root = document.documentElement;
   root.style.setProperty("--surface-opacity-scale", String(safeOpacity / 50));
   root.style.setProperty("--surface-opacity", String(safeOpacity / 100));
-  root.style.setProperty("--glass-blur", `${clampGlassBlur(blur)}px`);
+  root.style.setProperty("--surface-fill", String(Math.pow(safeOpacity / 100, 1.65)));
+  root.style.setProperty("--glass-blur", `${material.blur}px`);
+  root.style.setProperty("--glass-specular-strength", String(material.specular));
 };
 
 export const initializeAppearance = () => {

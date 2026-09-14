@@ -46,4 +46,11 @@ describe("local settings", () => {
     expect(html).toContain("advanced_target_global");
     expect(html).toContain("advanced_add_rule");
   });
+
+  it("shows readable Windows shortcut names and separators", () => {
+    const html = renderToStaticMarkup(<SettingsHarness subpage="home" />);
+    expect(html).toContain("Alt + Shift + V");
+    expect(html).toContain("Alt + F");
+    expect(html).not.toContain("⌥");
+  });
 });

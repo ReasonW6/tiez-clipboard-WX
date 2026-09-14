@@ -1,15 +1,16 @@
 /* Mica keeps the wallpaper tint in the foundation, with calm content surfaces. */
 :root.theme-mica, body.theme-mica {
-  --bg-window: rgba(240,243,248,calc(.18 + var(--surface-opacity,.5) * .65));
-  --bg-panel: rgba(255,255,255,.6);
-  --bg-input: rgba(255,255,255,.75);
-  --bg-element: rgba(255,255,255,.66);
-  --bg-button: rgba(255,255,255,.42);
+  --bg-window: rgba(240,243,248,var(--surface-fill));
+  --bg-panel: rgba(255,255,255,calc(.04 + var(--surface-fill) * .96));
+  --bg-input: rgba(255,255,255,calc(.12 + var(--surface-fill) * .88));
+  --bg-element: rgba(255,255,255,calc(.06 + var(--surface-fill) * .94));
+  --bg-button: rgba(255,255,255,calc(.06 + var(--surface-fill) * .94));
+  --shell-backdrop-filter: blur(calc(32px * var(--surface-fill))) saturate(120%);
 }
 :root.theme-mica.dark-mode, body.theme-mica.dark-mode {
-  --bg-window: rgba(28,32,40,calc(.16 + var(--surface-opacity,.5) * .7));
-  --bg-panel: rgba(52,58,70,.58);
-  --bg-input: rgba(220,230,255,.07);
-  --bg-element: rgba(55,62,76,.5);
-  --bg-button: rgba(220,230,255,.055);
+  --bg-window: rgba(28,32,40,var(--surface-fill));
+  --bg-panel: rgba(40,46,58,calc(.04 + var(--surface-fill) * .96));
+  --bg-input: rgba(49,58,74,calc(.12 + var(--surface-fill) * .88));
+  --bg-element: rgba(43,51,65,calc(.06 + var(--surface-fill) * .94));
+  --bg-button: rgba(49,58,74,calc(.06 + var(--surface-fill) * .94));
 }

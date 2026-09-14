@@ -149,25 +149,26 @@ test("paste preserves IDs; edit/delete actions do not trigger a paste", async ({
   expect(await commandCalls(page, "copy_to_clipboard")).toHaveLength(1);
 });
 
-test("glass clarity and blur update the rendered material and persist", async ({ page }) => {
+test("one glass transparency slider updates the material and persists", async ({ page }) => {
   await start(page, "?theme=liquid-glass");
   await appearance(page);
-  const clarity = page.getByRole("slider", { name: "玻璃通透度" });
-  const blur = page.getByRole("slider", { name: "玻璃模糊度" });
-  await clarity.fill("80");
-  await blur.fill("5");
-  await expect.poll(() => page.evaluate(() => getComputedStyle(document.body).getPropertyValue("--glass-blur"))).toBe("5px");
+  const transparency = page.getByRole("slider", { name: "液态玻璃透明度" });
+  await expect(page.getByRole("slider", { name: "玻璃模糊度" })).toHaveCount(0);
+  await transparency.fill("80");
   await expect.poll(() => page.evaluate(() => getComputedStyle(document.body).getPropertyValue("--surface-opacity"))).toBe("0.2");
-  expect(await page.evaluate(() => (window as any).testApp.settings["app.liquid_glass_blur"])).toBe("5");
+  const blur = await page.evaluate(() => getComputedStyle(document.body).getPropertyValue("--glass-blur"));
+  expect(parseFloat(blur)).toBeGreaterThan(0);
+  expect(parseFloat(blur)).toBeLessThan(5);
   expect(await page.evaluate(() => (window as any).testApp.settings["app.surface_opacity"])).toBe("20");
   await page.reload();
   await expect(page.locator(".header-title")).toHaveText("TieZ");
-  await expect.poll(() => page.evaluate(() => getComputedStyle(document.body).getPropertyValue("--glass-blur"))).toBe("5px");
+  await expect.poll(() => page.evaluate(() => getComputedStyle(document.body).getPropertyValue("--glass-blur"))).toBe(blur);
   await openTags(page);
-  expect(await page.locator(".tm-search").evaluate(el => getComputedStyle(el).backdropFilter)).toContain("blur(5px)");
+  expect(await page.locator(".tm-search").evaluate(el => getComputedStyle(el, "::before").backdropFilter)).toContain(`blur(${blur})`);
   await page.emulateMedia({ reducedMotion: "reduce" });
   expect(await page.locator(".tm-add").evaluate(el => getComputedStyle(el).transitionDuration)).toBe("0s");
 });
+
 
 test("tag CRUD preserves renamed items and confirms deleting a tag and its items", async ({ page }) => {
   await start(page);
@@ -200,7 +201,7 @@ test("glass uses solid surfaces when transparency is reduced, including dark mod
   await cdp.send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-transparency", value: "reduce" }] });
   expect(await page.locator("#root").evaluate(el => getComputedStyle(el).backgroundColor)).toBe("rgb(35, 39, 49)");
   await openTags(page);
-  expect(await page.locator(".tm-search").evaluate(el => getComputedStyle(el).backdropFilter)).toContain("blur(0px)");
+  expect(await page.locator(".tm-search").evaluate(el => getComputedStyle(el, "::before").backdropFilter)).toBe("none");
 });
 
 

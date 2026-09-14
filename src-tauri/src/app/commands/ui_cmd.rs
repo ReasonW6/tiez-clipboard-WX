@@ -66,6 +66,7 @@ pub fn set_theme(
     theme: String,
     color_mode: Option<String>,
     show_app_border: Option<bool>,
+    backdrop_enabled: Option<bool>,
 ) -> AppResult<()> {
     let mut effective_color_mode = color_mode.clone();
     if effective_color_mode
@@ -87,6 +88,10 @@ pub fn set_theme(
             .map(|v| v != "false");
     }
     let show_border = effective_show_app_border.unwrap_or(true);
+    let backdrop_enabled = backdrop_enabled.unwrap_or_else(|| {
+        let opacity = db_state.settings_repo.get("app.surface_opacity").ok().flatten();
+        saved_backdrop_enabled(opacity.as_deref())
+    });
 
     // Set Tao's preferred theme too. A DWM attribute alone is overwritten by
     // WM_SETTINGCHANGE (including the system theme refresh during logon).
@@ -117,7 +122,6 @@ pub fn set_theme(
             .hwnd()
             .map_err(|e| AppError::Internal(e.to_string()))?;
         let hwnd = HWND(hwnd.0 as _);
-        let _ = window_vibrancy::clear_vibrancy(&window);
 
         let is_dark = match effective_color_mode.as_deref() {
             Some("light") => false,
@@ -159,15 +163,14 @@ pub fn set_theme(
 
         let build = windows_version::OsVersion::current().build;
         let is_win11 = build >= 22000;
-        let is_win10_1803 = build >= 17134;
         let is_win10 = build >= 10240 && build < 22000;
 
-        match theme.as_str() {
-            "mica" if is_win11 => {
+        match native_backdrop(&theme, backdrop_enabled, is_win11) {
+            NativeBackdrop::Mica => {
                 let _ = window_vibrancy::apply_mica(&window, Some(is_dark));
                 let _ = window.set_shadow(show_border);
             }
-            "acrylic" | "liquid-glass" if is_win10_1803 && !is_win10 => {
+            NativeBackdrop::Acrylic => {
                 let _ = window_vibrancy::apply_acrylic(
                     &window,
                     Some(if is_dark {
@@ -178,12 +181,12 @@ pub fn set_theme(
                 );
                 let _ = window.set_shadow(show_border);
             }
-            "acrylic" | "liquid-glass" if is_win10 => {
-                let _ = window.set_shadow(false);
-            }
-            _ => {
-                let _ = window
-                    .set_shadow(show_border && is_win11 && theme != "mica" && theme != "acrylic");
+            NativeBackdrop::None => {
+                // clear_vibrancy is macOS-only; explicitly clear both Windows
+                // backdrops when choosing a solid theme or the clear endpoint.
+                let _ = window_vibrancy::clear_acrylic(&window);
+                let _ = window_vibrancy::clear_mica(&window);
+                let _ = window.set_shadow(show_border && is_win11 && !is_win10);
             }
         }
     }
@@ -197,7 +200,7 @@ pub fn set_theme(
         };
 
         let _ = window_vibrancy::clear_vibrancy(&window);
-        if theme == "mica" || theme == "acrylic" || theme == "liquid-glass" {
+        if backdrop_enabled && matches!(theme.as_str(), "mica" | "acrylic" | "liquid-glass") {
             let _ = window_vibrancy::apply_vibrancy(
                 &window,
                 window_vibrancy::NSVisualEffectMaterial::HudWindow,
@@ -209,4 +212,50 @@ pub fn set_theme(
 
     let _ = window.emit("theme-changed", theme);
     Ok(())
+}
+
+fn saved_backdrop_enabled(opacity: Option<&str>) -> bool {
+    let parse = |value: Option<&str>, fallback: f64| value
+        .and_then(|s| s.parse::<f64>().ok()).filter(|v| v.is_finite()).unwrap_or(fallback);
+    parse(opacity, 50.0) > 0.0
+}
+
+#[derive(Debug, PartialEq)]
+enum NativeBackdrop { None, Mica, Acrylic }
+
+fn native_backdrop(theme: &str, enabled: bool, is_win11: bool) -> NativeBackdrop {
+    if !enabled || !is_win11 { return NativeBackdrop::None; }
+    match theme {
+        "mica" => NativeBackdrop::Mica,
+        "acrylic" | "liquid-glass" => NativeBackdrop::Acrylic,
+        _ => NativeBackdrop::None,
+    }
+}
+
+#[cfg(test)]
+mod material_tests {
+    use super::*;
+
+    #[test]
+    fn clear_endpoint_survives_restart_and_really_disables_the_native_backdrop() {
+        for theme in ["mica", "acrylic", "liquid-glass"] {
+            let enabled = saved_backdrop_enabled(Some("0"));
+            assert!(!enabled);
+            assert_eq!(native_backdrop(theme, enabled, true), NativeBackdrop::None);
+        }
+        assert!(!saved_backdrop_enabled(Some("-1")));
+        assert!(saved_backdrop_enabled(Some("50")));
+    }
+
+    #[test]
+    fn switching_away_clears_glass_and_preserves_windows_10_fallback() {
+        assert_eq!(native_backdrop("mica", true, true), NativeBackdrop::Mica);
+        assert_eq!(native_backdrop("liquid-glass", true, true), NativeBackdrop::Acrylic);
+        for theme in ["retro", "paper", "sticky-note", "sakura"] {
+            assert_eq!(native_backdrop(theme, true, true), NativeBackdrop::None);
+        }
+        assert_eq!(native_backdrop("liquid-glass", true, false), NativeBackdrop::None);
+        assert!(saved_backdrop_enabled(None));
+        assert!(saved_backdrop_enabled(Some("NaN")));
+    }
 }

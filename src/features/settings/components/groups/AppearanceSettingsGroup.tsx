@@ -9,7 +9,6 @@ import {
     supportsSurfaceOpacity
 } from "../../../../shared/config/themes";
 import type { Locale } from "../../../../shared/types";
-import { clampGlassBlur } from "../../../../shared/lib/appearance";
 
 interface LabelWithHintProps {
     label: string;
@@ -42,7 +41,6 @@ interface AppearanceSettingsGroupProps {
     customBackgroundOpacity: number;
     setCustomBackgroundOpacity: (val: number) => void;
     surfaceOpacity: number;
-    liquidGlassBlur: number;
     setSurfaceOpacity: (val: number) => void;
     saveAppSetting: (key: string, val: string) => void;
 }
@@ -86,7 +84,6 @@ const AppearanceSettingsGroup = ({
     customBackgroundOpacity,
     setCustomBackgroundOpacity,
     surfaceOpacity,
-    liquidGlassBlur,
     setSurfaceOpacity,
     saveAppSetting,
 }: AppearanceSettingsGroupProps) => {
@@ -354,14 +351,14 @@ const AppearanceSettingsGroup = ({
                         {showSurfaceOpacityControls && (
                         <div className="setting-item column">
                             <div className="item-label-group" style={{ marginBottom: '4px', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span className="item-label">{t(theme === 'liquid-glass' ? 'glass_clarity' : 'surface_opacity')}</span>
+                                <span className="item-label">{t(theme === 'liquid-glass' ? 'glass_transparency' : 'surface_opacity')}</span>
                                 <span className="hint" style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{theme === 'liquid-glass' ? 100 - surfaceOpacity : surfaceOpacity}%</span>
                             </div>
                             <input
                                 type="range"
                                 min="0"
                                 max="100"
-                                aria-label={t(theme === 'liquid-glass' ? 'glass_clarity' : 'surface_opacity')}
+                                aria-label={t(theme === 'liquid-glass' ? 'glass_transparency' : 'surface_opacity')}
                                 value={theme === 'liquid-glass' ? 100 - surfaceOpacity : surfaceOpacity}
                                 onChange={(e) => {
                                     const val = theme === 'liquid-glass' ? 100 - Number(e.target.value) : Number(e.target.value);
@@ -370,15 +367,13 @@ const AppearanceSettingsGroup = ({
                                 }}
                                 style={buildRangeStyle(theme === 'liquid-glass' ? 100 - surfaceOpacity : surfaceOpacity, 0, 100)}
                             />
+                            {theme === 'liquid-glass' && <>
+                                <div className="glass-range-labels"><span>{t('glass_soft')}</span><span>{t('glass_clear')}</span></div>
+                                <p className="glass-setting-hint">{t('glass_transparency_hint')}</p>
+                            </>}
                         </div>
                         )}
-                        {theme === 'liquid-glass' && <div className="setting-item column">
-                            <div className="glass-setting-label"><span className="item-label">{t('glass_blur')}</span><span>{clampGlassBlur(liquidGlassBlur)}px</span></div>
-                            <input type="range" aria-label={t('glass_blur')} min="0" max="32" step="1" value={clampGlassBlur(liquidGlassBlur)}
-                                onChange={event => saveAppSetting('liquid_glass_blur', event.target.value)} style={buildRangeStyle(clampGlassBlur(liquidGlassBlur), 0, 32)} />
-                            <div className="glass-range-labels"><span>{t('glass_clear')}</span><span>{t('glass_soft')}</span></div>
-                            <p className="glass-setting-hint">{t('glass_blur_hint')}</p>
-                        </div>}
+
                     </>
                 )}
             </div>

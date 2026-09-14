@@ -59,7 +59,7 @@ Explore 7 built-in themes designed for different workspaces and workflows.
 - **Native Efficiency**: Built with Tauri 2 and Rust for minimum memory footprint.
 - **Smart Capture**: Automatically collects text, rich text (HTML), images, and file paths.
 - **Modern UI**: **7 built-in themes**, including refreshed Mica/Acrylic effects and Liquid Glass, with light and dark modes.
-- **Liquid Glass Controls**: Adjust clarity (0–100%) and control backdrop blur (0–32px) in Appearance settings.
+- **Liquid Glass Controls**: One transparency slider (0–100%) adjusts the tint, frosting, and highlights together.
 - **Edge Docking**: Automatically hides at the screen edge to stay out of your way.
 
 ### Management & Enhancements

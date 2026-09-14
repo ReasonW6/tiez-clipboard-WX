@@ -186,8 +186,8 @@ const AppMainContent = ({
   if (showTagManager && tagManagerEnabled) {
     return (
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
+        initial={{ opacity: 0, y: 12, scale: .985 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
         style={{ height: "100%" }}
       >
         <TagManager t={t} theme={theme} />
@@ -198,8 +198,8 @@ const AppMainContent = ({
   if (showEmojiPanel) {
     return (
       <motion.div
-        initial={{ opacity: 0, x: 20 }}
-        animate={{ opacity: 1, x: 0 }}
+        initial={{ opacity: 0, y: 12, scale: .985 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
         style={{ height: "100%", overflow: "hidden" }}
       >
         <EmojiPanel
@@ -218,8 +218,8 @@ const AppMainContent = ({
 
     return (
       <motion.div
-        initial={{ opacity: 0, x: 20 }}
-        animate={{ opacity: 1, x: 0 }}
+        initial={{ opacity: 0, y: 12, scale: .985 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
         className={`settings-view ${settingsPanelProps.settingsSubpage === "advanced" ? "advanced-view-shell" : ""}`}
         style={{
           display: "flex",

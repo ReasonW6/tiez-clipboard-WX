@@ -1136,6 +1136,20 @@ body.theme-acrylic .settings-view select.search-input option {
   content: none;
 }
 
+.key-cap-chord {
+  min-width: max-content;
+  height: auto;
+  min-height: 30px;
+  padding: 6px 10px;
+  margin: 0;
+  white-space: nowrap;
+  font: 600 12px/1.4 var(--font-mono);
+  letter-spacing: 0.015em;
+}
+
+.setting-item:has(.key-group) { flex-wrap: wrap; gap: 8px; }
+.setting-item > .key-group { flex-shrink: 0; margin-left: auto; }
+
 .key-group:active .key-cap,
 .key-group.recording .key-cap {
   transform: var(--keycap-active-transform);
@@ -1195,8 +1209,8 @@ body.theme-acrylic .settings-view select.search-input option {
 .theme-swatch-liquid-glass i { border: 1px solid rgba(255,255,255,.7); background: rgba(255,255,255,.3); border-radius: 999px; }
 .theme-swatch-paper { background: #efe6d3; }
 .theme-swatch-sakura { background: linear-gradient(125deg,#f4d5e2,#eee4f4); }
-.glass-setting-label, .glass-range-labels { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-.glass-setting-label > span:last-child, .glass-range-labels, .glass-setting-hint { color: var(--text-secondary); font-size: 11px; line-height: 1.5; }
+.glass-range-labels { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.glass-range-labels, .glass-setting-hint { color: var(--text-secondary); font-size: 11px; line-height: 1.5; }
 @media (max-width: 380px) {
   .theme-choice-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }

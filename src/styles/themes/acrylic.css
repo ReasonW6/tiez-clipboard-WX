@@ -1,21 +1,21 @@
 /* A single frosted backdrop and softly lit controls; content stays crisp. */
 :root.theme-acrylic, body.theme-acrylic {
-  --bg-window: rgba(242,246,252,calc(.1 + var(--surface-opacity,.5) * .74));
-  --bg-panel: rgba(255,255,255,.48);
-  --bg-input: rgba(255,255,255,.6);
-  --bg-element: rgba(255,255,255,.46);
-  --bg-button: rgba(255,255,255,.32);
-  --shell-backdrop-filter: blur(22px) saturate(125%);
+  --bg-window: rgba(242,246,252,var(--surface-fill));
+  --bg-panel: rgba(255,255,255,calc(.03 + var(--surface-fill) * .97));
+  --bg-input: rgba(255,255,255,calc(.1 + var(--surface-fill) * .9));
+  --bg-element: rgba(255,255,255,calc(.04 + var(--surface-fill) * .96));
+  --bg-button: rgba(255,255,255,calc(.05 + var(--surface-fill) * .95));
+  --shell-backdrop-filter: blur(calc(64px * var(--surface-fill))) saturate(145%);
   --card-border: 1px solid rgba(255,255,255,.6);
   --button-border: 1px solid rgba(255,255,255,.42);
   --card-shadow: inset 0 1px 0 rgba(255,255,255,.25), 0 2px 6px rgba(20,40,65,.035);
 }
 :root.theme-acrylic.dark-mode, body.theme-acrylic.dark-mode {
-  --bg-window: rgba(25,32,44,calc(.16 + var(--surface-opacity,.5) * .7));
-  --bg-panel: rgba(50,60,76,.55);
-  --bg-input: rgba(218,232,255,.085);
-  --bg-element: rgba(58,70,89,.42);
-  --bg-button: rgba(218,232,255,.065);
+  --bg-window: rgba(25,32,44,var(--surface-fill));
+  --bg-panel: rgba(38,49,65,calc(.03 + var(--surface-fill) * .97));
+  --bg-input: rgba(48,63,82,calc(.1 + var(--surface-fill) * .9));
+  --bg-element: rgba(38,49,65,calc(.04 + var(--surface-fill) * .96));
+  --bg-button: rgba(48,63,82,calc(.05 + var(--surface-fill) * .95));
   --card-border: 1px solid rgba(225,238,255,.1);
   --button-border: 1px solid rgba(225,238,255,.1);
   --card-shadow: inset 0 1px 0 rgba(255,255,255,.035), 0 2px 6px rgba(0,0,0,.05);

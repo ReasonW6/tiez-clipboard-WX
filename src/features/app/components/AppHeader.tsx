@@ -113,7 +113,7 @@ const AppHeader = ({
           </span>
         </div>
       </div>
-      <div className="header-actions window-no-drag">
+      <motion.div layout="size" className="header-actions window-no-drag">
         {/* Pin Button - Always visible but single instance */}
         <button
           className={`btn-icon ${isWindowPinned ? 'active' : ''}`}
@@ -153,7 +153,7 @@ const AppHeader = ({
         }}>
           <X size={16} />
         </button>
-      </div>
+      </motion.div>
     </div>
 
     {!showSettings && !showTagManager && !showEmojiPanel && (
@@ -171,7 +171,7 @@ const AppHeader = ({
             style={{ flexShrink: 0 }}
           >
             <div className="search-container window-no-drag">
-              <div style={{ position: 'relative' }}>
+              <div className={theme === 'liquid-glass' ? 'liquid-search' : undefined} style={{ position: 'relative' }}>
                 <Search size={14} className="search-icon" />
                 <input
                   ref={searchInputRef}
@@ -250,20 +250,21 @@ const AppHeader = ({
                 {['text', 'image', 'file', 'url', 'code', 'video', 'rich_text'].map(t => (
                   <button
                     key={t}
-                    className={`btn-icon ${typeFilter === t ? 'active' : ''}`}
+                    className={`btn-icon type-filter-btn ${typeFilter === t ? 'active' : ''}`}
                     onClick={() => setTypeFilter(typeFilter === t ? null : t)}
                     style={{
                       width: 'auto',
                       padding: '4px 8px',
                       fontSize: '11px',
-                      borderRadius: '4px',
+                      borderRadius: theme === 'liquid-glass' ? '999px' : '4px',
                       whiteSpace: 'nowrap',
                       flexShrink: 0,
                       opacity: typeFilter === t ? 1 : 0.7
                     }}
                     title={getTypeName(t)}
                   >
-                    {getTypeName(t)}
+                    {theme === 'liquid-glass' && typeFilter === t && <motion.span className="type-filter-selection" layoutId="clipboard-type-selection" transition={{ type: 'spring', stiffness: 420, damping: 30 }} />}
+                    <span className="type-filter-label">{getTypeName(t)}</span>
                   </button>
                 ))}
               </div>

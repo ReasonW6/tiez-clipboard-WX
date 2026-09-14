@@ -173,7 +173,6 @@ const AdvancedSettingsWindow = () => {
         clipboardItemFontSize,
         clipboardTagFontSize,
         surfaceOpacity,
-        liquidGlassBlur: Number(appState.appSettings["app.liquid_glass_blur"] ?? 18)
     });
 
     useCustomBackground({

@@ -64,6 +64,9 @@
   --queue-shadow: var(--shadow-md);
 }
 :is(:root, body):where(.theme-mica, .theme-acrylic, .theme-liquid-glass).dark-mode {
+  --bg-body: transparent;
+  --bg-content: transparent;
+  --bg-toolbar: transparent;
   --text-primary: #f0f2f6;
   --text-secondary: #b0b8c6;
   --text-muted: #a1acbd;
@@ -98,7 +101,15 @@ body.compact-preview:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) #root 
 @media (prefers-reduced-transparency: reduce) {
   :root:is(.theme-mica, .theme-acrylic, .theme-liquid-glass), body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) {
     --bg-window: var(--material-solid) !important; --glass-blur: 0px !important; --glass-fill: var(--material-solid) !important;
+    --surface-fill: 1 !important; --shell-backdrop-filter: none !important;
   }
+}
+
+body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) :is(.btn-icon, .theme-choice, .tm-tag, .segment-btn) {
+  transition: background-color .2s ease, border-color .2s ease, box-shadow .25s ease, color .2s ease;
+}
+body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) :is(.btn-icon, .theme-choice, .tm-tag, .segment-btn):focus-visible {
+  outline: 2px solid var(--accent-color); outline-offset: 3px;
 }
 @media (forced-colors: active) {
   :root:is(.theme-mica, .theme-acrylic, .theme-liquid-glass), body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) {

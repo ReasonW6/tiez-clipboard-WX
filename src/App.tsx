@@ -45,6 +45,8 @@ import { useOverlays } from "./shared/hooks/useOverlays";
 import { useWindowSessionReset } from "./shared/hooks/useWindowSessionReset";
 import { useAutoUpdate } from "./shared/hooks/useAutoUpdate";
 import UpdateDialog from "./shared/components/UpdateDialog";
+import { MotionConfig } from "framer-motion";
+import LiquidGlassEffects from "./shared/components/LiquidGlassEffects";
 import type { ClipboardEntry } from "./shared/types";
 import type { QuickPasteHint, VirtualClipboardListHandle } from "./features/clipboard/types";
 
@@ -579,7 +581,6 @@ const App = () => {
     clipboardTagFontSize,
     surfaceOpacity,
     showAppBorder,
-    liquidGlassBlur: Number(appSettings["app.liquid_glass_blur"] ?? 18)
   });
 
   // Pre-warm compact preview window only where warmup is safe.
@@ -860,9 +861,11 @@ const App = () => {
   });
 
   return (
+    <MotionConfig reducedMotion="user" transition={{ type: "spring", stiffness: 420, damping: 32, mass: .8 }}>
     <div
       className="app-container"
     >
+      <LiquidGlassEffects theme={theme} opacity={surfaceOpacity} />
       <AppHeader
         t={t}
         showSettings={showSettings}
@@ -962,7 +965,8 @@ const App = () => {
         onUpdate={updateStatus === "ready" ? onApplyUpdate : onStartDownload}
         onClose={closeUpdateDialog}
       />
-    </div >
+    </div>
+    </MotionConfig>
   );
 }
 

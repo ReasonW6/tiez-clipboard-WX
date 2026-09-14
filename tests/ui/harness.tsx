@@ -13,7 +13,7 @@ const params = new URLSearchParams(location.search);
 const settings: Record<string, string> = {
   "app.theme": params.get("theme") || "acrylic",
   "app.color_mode": params.get("mode") || "light",
-  "app.surface_opacity": "50", "app.liquid_glass_blur": "18", "app.language": "zh",
+  "app.surface_opacity": "50", "app.language": "zh",
   "app.tag_manager_enabled": "true", "app.show_app_border": "true", "app.window_pinned": "true",
   "app.show_search_box": "true", "app.capture_files": "true", "app.arrow_key_selection": "true"
 };

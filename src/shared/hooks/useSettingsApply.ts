@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { applyThemeClasses, normalizeThemeId } from "../config/themes";
-import { applyColorMode, applySurfaceSettings } from "../lib/appearance";
+import { applyColorMode, applySurfaceSettings, nativeBackdropEnabled } from "../lib/appearance";
 
 interface UseSettingsApplyOptions {
   theme: string;
@@ -12,7 +12,6 @@ interface UseSettingsApplyOptions {
   clipboardItemFontSize: number;
   clipboardTagFontSize: number;
   surfaceOpacity: number;
-  liquidGlassBlur?: number;
   showAppBorder: boolean;
 }
 
@@ -21,12 +20,17 @@ let nativeThemeUpdate: Promise<unknown> = Promise.resolve();
 
 export const useSettingsApply = ({
   theme, colorMode, compactMode, settingsLoaded, clipboardItemFontSize,
-  clipboardTagFontSize, surfaceOpacity, liquidGlassBlur = 18, showAppBorder
+  clipboardTagFontSize, surfaceOpacity, showAppBorder
 }: UseSettingsApplyOptions) => {
+  const backdropEnabled = nativeBackdropEnabled(surfaceOpacity);
   useEffect(() => {
     let disposed = false;
-    void invoke<{ is_windows_10: boolean }>("get_platform_info").then(platform => {
-      if (!disposed) document.body.classList.toggle("windows-10", platform.is_windows_10);
+    void invoke<{ is_windows_10: boolean; is_windows_11: boolean }>("get_platform_info").then(platform => {
+      if (disposed) return;
+      document.body.classList.toggle("windows-10", platform.is_windows_10);
+      for (const target of [document.documentElement, document.body]) {
+        target.classList.toggle("native-window-frame", platform.is_windows_11);
+      }
     }).catch(console.error);
     return () => { disposed = true; };
   }, []);
@@ -42,7 +46,7 @@ export const useSettingsApply = ({
       nativeThemeUpdate = nativeThemeUpdate.catch(() => {}).then(async () => {
         if (disposed) return;
         await invoke("set_theme", {
-          theme: normalizedTheme, colorMode, showAppBorder
+          theme: normalizedTheme, colorMode, showAppBorder, backdropEnabled
         });
         // Query only after clearing the window's explicit mode when following the OS.
         if (colorMode === "system" && !disposed) {
@@ -66,13 +70,13 @@ export const useSettingsApply = ({
     }
     updateNative();
     return () => { disposed = true; unlisten?.(); };
-  }, [theme, colorMode, settingsLoaded, showAppBorder]);
+  }, [theme, colorMode, settingsLoaded, showAppBorder, backdropEnabled]);
 
   useEffect(() => {
     if (!settingsLoaded) return;
     document.body.classList.toggle("compact-mode", compactMode);
     document.documentElement.style.setProperty("--clipboard-item-font-size", `${clipboardItemFontSize}px`);
     document.documentElement.style.setProperty("--clipboard-tag-font-size", `${clipboardTagFontSize}px`);
-    applySurfaceSettings(surfaceOpacity, liquidGlassBlur);
-  }, [compactMode, clipboardItemFontSize, clipboardTagFontSize, surfaceOpacity, liquidGlassBlur, settingsLoaded]);
+    applySurfaceSettings(surfaceOpacity);
+  }, [compactMode, clipboardItemFontSize, clipboardTagFontSize, surfaceOpacity, settingsLoaded]);
 };

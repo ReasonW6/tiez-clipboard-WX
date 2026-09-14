@@ -7,11 +7,11 @@
 - 剪贴板采集去重时保留原记录的标签、敏感标记、置顶信息和使用次数。更新记录与标签关联在同一事务内完成，随后才执行容量清理。数据库查询失败时停止本次分发，避免展示未保存的记录。
 - 标签页小于等于 620px 时使用顶部标签栏，更宽时使用侧栏。标签切换和刷新使用请求序号防止过期响应覆盖当前内容；读取失败保留已有条目并显示错误。编辑及批量粘贴按 ID 读取完整内容，避免使用列表截断预览。
 - 标签页仍保留原有的删除语义：删除标签会删除该标签下的所有条目，操作前有明确确认；单条删除和粘贴是独立按钮。
-- 重做云母和毛玻璃材质，加入液态玻璃、通透度与控件模糊度调节。适配明暗模式、Windows 10 实色降级、减少透明度与减少动态效果。
+- 重做云母和毛玻璃材质，加入液态玻璃及单一透明度滑块。适配明暗模式、Windows 10 实色降级、减少透明度与减少动态效果。
 
 ## 自动检查
 
-本次执行结果：22 项前端测试、70 项 Rust 测试、29 项浏览器回归通过，TypeScript 与 Vite 生产构建通过。Rust 最终全量测试使用正常 Windows 用户凭据验证 DPAPI。
+本次执行结果：27 项前端测试、72 项 Rust 测试、43 项浏览器回归通过，TypeScript 与 Vite 生产构建通过。Rust 最终全量测试使用正常 Windows 用户凭据验证 DPAPI。
 
 - `npm test`：前端单元测试及设置页渲染。
 - `npm run test:ui`：Playwright 浏览器回归。覆盖全部七款主题与相反系统明暗、快速切换、关闭重置、固定窗口失焦、250/320/352/425/780px 标签布局、响应乱序、失败时保留内容、粘贴参数、编辑/删除命中区域、长文本与设置重载。
@@ -30,6 +30,17 @@
 
 ## 材质边界与人工检查
 
-液态玻璃参考 [Apple Materials](https://developer.apple.com/design/human-interface-guidelines/materials)，把玻璃用于导航和控件；云母与毛玻璃参考 [Microsoft Mica](https://learn.microsoft.com/en-us/windows/apps/design/style/mica) 和 [Acrylic](https://learn.microsoft.com/en-us/windows/apps/design/style/acrylic)。Windows 原生背景与 CSS 控件材质共同实现外观，不包含 Apple 平台的原生折射渲染器。模糊滑块只调整应用内控件背后的内容，Windows 原生桌面模糊半径固定。
+液态玻璃参考 [Apple Materials](https://developer.apple.com/design/human-interface-guidelines/materials)，把玻璃用于导航和控件；云母与毛玻璃参考 [Microsoft Mica](https://learn.microsoft.com/en-us/windows/apps/design/style/mica) 和 [Acrylic](https://learn.microsoft.com/en-us/windows/apps/design/style/acrylic)。Windows 原生背景与 CSS 控件材质共同实现外观，不包含 Apple 平台的原生折射渲染器。液态玻璃的透明度滑块联动底色、应用内模糊、折射与高光强度，内部模糊范围为 0–64px。Windows 原生桌面磨砂半径固定；完全通透时关闭原生背景磨砂。
 
 浏览器预览可以核对布局和网页颜色，不能证明 DWM 桌面材质、实际粘贴目标或开机自启动行为。发布后可在正常用户会话选择毛玻璃浅色、保持系统深色，再重启检查自启动；同时复核固定与非固定模式下的标签粘贴及重新呼出主页。本次未重启用户电脑，也未操作其真实剪贴板或数据库。
+
+## 材质与快捷键二次调整
+
+- 液态玻璃仅保留一个 0–100% 透明度滑块，从磨砂到清透连续调整；旧独立模糊配置不再参与渲染，现有透明度值保留。不透明度映射扩大到完全清透至实色，窗口底板、内容面板与控件同步变化。云母、毛玻璃、液态玻璃与樱花的浅色、深色端点及重载均有覆盖；清除深色模式遗留的固定 84% 不透明顶栏与内容底色。
+- 液态玻璃以 SVG 位移滤镜折射边缘背景，指针高光平滑跟随，按钮有按压回弹与光波，筛选选中背景和页面切换使用弹簧过渡。文字与图标不经过位移滤镜。指针停止后动画帧停止，隐藏、切换主题与减少动态效果会清理光波和监听。
+- Windows 11 的云母、毛玻璃、液态玻璃与樱花主题由 DWM 统一裁切窗口，网页填满原生客户区，不再叠加 14/18px 的第二套窗口圆角；其他系统保留网页圆角。
+- 修复 Windows 快捷键强制使用 macOS 符号的问题，改为带分隔符的键名，并将 Command/Meta 等已存储别名显示为 Win。250px 与 352px 下验证显示、录制与不溢出。
+- 专项测试确认滤镜开关确实改变渲染像素，且按钮标签不变；另覆盖原生材质清除、启动时恢复清透设置、无障碍模式与隐藏后的动效清理。
+- 设计参考 [Apple Meet Liquid Glass](https://developer.apple.com/videos/play/wwdc2025/219/) 中的折射与交互响应原则；实现使用现有 React/Framer Motion、CSS 与 SVG，无新增运行时依赖。
+
+预览位于 artifacts/material-preview/index.html，包含通透/磨砂对比、明暗模式、快捷键及交互视频。预览使用虚构数据与测试背景，不包含原生桌面合成；本轮未执行真实 Windows 窗口的人工交互或重启验证。

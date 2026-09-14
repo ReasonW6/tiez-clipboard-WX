@@ -395,7 +395,6 @@ const SettingsPanel = (props: SettingsPanelProps) => {
                 customBackgroundOpacity={customBackgroundOpacity}
                 setCustomBackgroundOpacity={setCustomBackgroundOpacity}
                 surfaceOpacity={surfaceOpacity}
-                liquidGlassBlur={Number(appSettings['app.liquid_glass_blur'] ?? 18)}
                 setSurfaceOpacity={setSurfaceOpacity}
                 saveAppSetting={saveAppSetting}
             />
