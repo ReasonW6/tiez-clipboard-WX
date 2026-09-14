@@ -1,52 +1,130 @@
-# TieZ Clipboard WX
+<p align="left">
+  <img src="docs/images/logo.png" width="32" vertical-align="middle" />
+  <b>Making fragmented information flow effortlessly.</b>
+</p>
 
-A Windows clipboard manager for personal use, based on [jimuzhe/tiez-clipboard](https://github.com/jimuzhe/tiez-clipboard).
+---
 
-[简体中文](README.zh-CN.md)
+<div align="center">
+  <img src="docs/images/logo.png" alt="TieZ Hero Logo" width="300" />
 
-This fork keeps clipboard history, text and rich text, images, file paths, search, tags, pinned items, sequential paste, external editing, privacy masking, emoji favorites and seven built-in themes. AI, cloud synchronization, MQTT, LAN transfer, the theme store and announcements have been removed.
+  ### **STAY FAST. STAY SYNCED.**
 
-Automatic updates use signed releases from [ReasonW6/tiez-clipboard-WX](https://github.com/ReasonW6/tiez-clipboard-WX/releases).
+  | STARS | VERSION | LICENSE | PLATFORM |
+  | :--- | :--- | :--- | :--- |
+  | [![Stars](https://img.shields.io/github/stars/jimuzhe/tiez-clipboard?label=STARS&style=for-the-badge&color=4CAF50)](https://github.com/jimuzhe/tiez-clipboard/stargazers) | [![Version](https://img.shields.io/github/v/release/jimuzhe/tiez-clipboard?label=VERSION&style=for-the-badge&color=2196F3)](https://github.com/jimuzhe/tiez-clipboard/releases) | [![License](https://img.shields.io/badge/LICENSE-GPL--3.0-FF9800?style=for-the-badge)](https://www.gnu.org/licenses/gpl-3.0) | [![Platform](https://img.shields.io/badge/PLATFORM-WIN%20%2F%20MAC-f44336?style=for-the-badge)](https://github.com/jimuzhe/tiez-clipboard/releases) |
 
-## Development
+  [English](./README.md) | [简体中文](./README.zh-CN.md)
+</div>
 
-Requirements: Windows 10/11 x64, Node.js 22.12+ or 24, stable Rust MSVC, Visual Studio C++ Build Tools and WebView2.
+---
 
-    npm ci
-    npm run tauri:dev
+<div align="center">
 
-The dev script starts only the frontend on port 1420. Native clipboard functions require tauri:dev.
+## Theme Gallery
 
-## Checks and builds
+Explore 4 elegant themes designed for every workspace and efficiency scenarios.
 
-    npm test
-    npm run build
-    npm run test:rust
-    npm run tauri:build
-    npm run build:portable
+  <table>
+    <tr>
+      <td align="center"><b>Frosted Glass</b><br><img src="docs/images/毛玻璃.png" width="220" /></td>
+      <td align="center"><b>Notebook Style</b><br><img src="docs/images/书.png" width="220" /></td>
+      <td align="center"><b>Sticky Note</b><br><img src="docs/images/便利贴.png" width="220" /></td>
+      <td align="center"><b>3D Interaction</b><br><img src="docs/images/3d.png" width="220" /></td>
+    </tr>
+  </table>
+</div>
 
-The default build creates an NSIS installer without requiring an updater signing key. The release script creates a signed update installer; see [release instructions](docs/RELEASING.md).
+---
 
-The portable archive is written to artifacts/portable/tiez-portable.zip. Extract it before launching. Its adjacent data directory holds the database and attachments. Sensitive clipboard data remains protected by the current Windows account. Automatic updates use the setup edition; replace the portable executable manually to keep using portable storage.
+## Why TieZ?
 
-## Code layout
+| Performance | Practicality | Privacy | Sync |
+| :--- | :--- | :--- | :--- |
+| **Instant Access**<br>Native listeners and Rust core ensure absolute speed. | **Power Workflows**<br>Rich text, tags, and AI-assisted actions. | **Local & Private**<br>Local-first storage with smart masking for sensitive data in previews. | **Cloud Fluent**<br>Seamless WebDAV and MQTT cross-device sync. |
 
-- src/features: React components and feature state.
-- src/shared/hooks: history, settings, keyboard navigation, clipboard events and updates.
-- src/shared/config/themes.ts: built-in theme registry.
-- src-tauri/src/main.rs: desktop initialization and Tauri command registration.
-- src-tauri/src/services/clipboard: clipboard capture and processing pipeline.
-- src-tauri/src/services/clipboard_ops.rs: clipboard writing and paste/focus handling.
-- src-tauri/src/infrastructure/repository: SQLite access and migrations.
+---
 
-Migration 11 removes retired settings and sync metadata while preserving clipboard history, tags and attachments. An old store theme falls back to Mica. Retired browser tokens and cached store styles are cleaned on startup.
+## Key Features
 
-License: [GPL-3.0](LICENSE). Original project credits are retained in the repository history and license.
+### Core Experience
+- **Native Efficiency**: Built with Tauri 2 and Rust for minimum memory footprint.
+- **Smart Capture**: Automatically collects text, rich text (HTML), images, and file paths.
+- **Modern UI**: Supports Mica/Acrylic effects and Dark/Light modes with **4 elegant theme styles**.
+- **Edge Docking**: Automatically hides at the screen edge to stay out of your way.
 
-### Material themes and UI tests
+### Management & Enhancements
+- **Tag System**: Organize your history with custom multi-color tags.
+- **Emoji Library**: Comprehensive built-in emoji management for quick access.
+- **Advanced Settings**: Granular control over cleanup rules and app behavior.
+- **Privacy Masking**: Auto-masks sensitive info like IDs and phone numbers in previews.
 
-Mica, Acrylic and Liquid Glass support light, dark and system appearance. Liquid Glass adds clarity (0–100%) and control blur (0–32px) sliders in Appearance settings. Windows supplies the desktop backdrop; the blur slider affects in-app navigation and controls, not the fixed Windows desktop blur radius. Windows 10 uses a solid fallback.
+### Networking & Transport
+- **WebDAV Sync**: Your data, your cloud. Complete cross-device history.
+- **LAN File Transfer**: Seamlessly move items between devices on the same network.
+- **Verifcation Code Sync**: Instant transfer of OTP codes to your active device.
+- **MQTT Connectivity**: Optimized for real-time synchronization between devices.
 
-Design references: [Apple Materials](https://developer.apple.com/design/human-interface-guidelines/materials), [Microsoft Mica](https://learn.microsoft.com/en-us/windows/apps/design/style/mica) and [Acrylic](https://learn.microsoft.com/en-us/windows/apps/design/style/acrylic).
+### Productivity Tools
+- **External Collaboration**: Open items in external editors with auto-sync back.
+- **Global Search**: Find anything by content, source app, or date.
+- **Sequential Paste**: Optimized workflow for high-frequency copy-paste tasks.
 
-Run `npx playwright install chromium` once, then `npm run test:ui`. The test harness uses fictional data and intercepts every Tauri command; it never accesses the real clipboard or database. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to use an existing Chromium executable. See [verification notes](docs/UI-VERIFICATION.md).
+---
+
+## Installation
+
+### Platform Support
+| Platform | Requirement | Output |
+| :--- | :--- | :--- |
+| **Windows** | Windows 10/11 (x86/x64)<br>*(Windows 11 Recommended)* | `.exe` / **`.zip` (Portable)** |
+| **macOS** | Sierra 10.15+ <br>(Apple Silicon / Intel) | `.dmg` |
+| **Linux** | Support Coming Soon | TBD |
+
+[**Download the Latest Release →**](https://github.com/jimuzhe/tiez-clipboard/releases)
+
+---
+
+## Star History
+
+<div align="center">
+  <a href="https://star-history.com/#jimuzhe/tiez-clipboard&Date">
+    <img src="https://api.star-history.com/svg?repos=jimuzhe/tiez-clipboard&type=Date" alt="Star History Chart" width="800" />
+  </a>
+</div>
+
+---
+
+## Community & Support
+
+If TieZ makes your life easier, consider supporting the journey.
+
+<div align="center">
+  <table style="border: none;">
+    <tr>
+      <td align="center" style="border: none;">
+        <p><strong>WeChat</strong></p>
+        <img src="docs/images/wx.jpeg" alt="WeChat" width="180" height="180" />
+      </td>
+      <td align="center" style="border: none;">
+        <p><strong>Alipay</strong></p>
+        <img src="docs/images/zfb.jpeg" alt="Alipay" width="180" height="180" />
+      </td>
+      <td align="center" style="border: none;">
+        <p><strong>QQ Group</strong></p>
+        <img src="docs/images/qq.jpeg" alt="QQ Group" width="180" height="180" />
+      </td>
+    </tr>
+  </table>
+  <br>
+  <p>Your support keeps the project active and the developer caffeinated!</p>
+  <a href="https://tiez.name666.top/zh/sponsors.html"><strong>View Sponsor List</strong></a>
+</div>
+
+---
+
+<div align="center">
+  Built with technical precision for every efficient developer.
+  <br>
+  <b>Please consider leaving a Star if you find this project useful.</b>
+</div>
