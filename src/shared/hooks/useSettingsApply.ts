@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { applyThemeClasses, normalizeThemeId } from "../config/themes";
-import { applyColorMode, applySurfaceSettings, nativeBackdropEnabled } from "../lib/appearance";
+import { applyColorMode, applySurfaceSettings } from "../lib/appearance";
 
 interface UseSettingsApplyOptions {
   theme: string;
@@ -22,7 +22,6 @@ export const useSettingsApply = ({
   theme, colorMode, compactMode, settingsLoaded, clipboardItemFontSize,
   clipboardTagFontSize, surfaceOpacity, showAppBorder
 }: UseSettingsApplyOptions) => {
-  const backdropEnabled = nativeBackdropEnabled(surfaceOpacity);
   useEffect(() => {
     let disposed = false;
     void invoke<{ is_windows_10: boolean; is_windows_11: boolean }>("get_platform_info").then(platform => {
@@ -46,7 +45,7 @@ export const useSettingsApply = ({
       nativeThemeUpdate = nativeThemeUpdate.catch(() => {}).then(async () => {
         if (disposed) return;
         await invoke("set_theme", {
-          theme: normalizedTheme, colorMode, showAppBorder, backdropEnabled
+          theme: normalizedTheme, colorMode, showAppBorder
         });
         // Query only after clearing the window's explicit mode when following the OS.
         if (colorMode === "system" && !disposed) {
@@ -70,7 +69,7 @@ export const useSettingsApply = ({
     }
     updateNative();
     return () => { disposed = true; unlisten?.(); };
-  }, [theme, colorMode, settingsLoaded, showAppBorder, backdropEnabled]);
+  }, [theme, colorMode, settingsLoaded, showAppBorder]);
 
   useEffect(() => {
     if (!settingsLoaded) return;

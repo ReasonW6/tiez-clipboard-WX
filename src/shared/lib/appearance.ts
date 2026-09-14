@@ -8,40 +8,44 @@ export const applyColorMode = (mode: "light" | "dark") => {
   document.documentElement.style.colorScheme = mode;
 };
 
-export const MAX_GLASS_BLUR = 64;
 export const clampSurfaceOpacity = (value: number) => Number.isFinite(value)
   ? Math.min(100, Math.max(0, value)) : 50;
 
-export const nativeBackdropEnabled = (opacity: number) => clampSurfaceOpacity(opacity) > 0;
-
-// One persisted value controls the entire material, including on reload.
-export const getLiquidGlassMaterial = (opacity: number) => {
+// Regular material: a continuous tint range above a stable native backdrop.
+// Content retains its own contrast floor, including over a dark desktop.
+export const getMaterialSurfaces = (opacity: number) => {
   const density = clampSurfaceOpacity(opacity) / 100;
   return {
-    blur: Number((MAX_GLASS_BLUR * Math.pow(density, 1.85)).toFixed(2)),
-    specular: .85 - density * .45,
-    refraction: 24 - density * 18
+    window: .22 + density * .74,
+    content: .90 + density * .08,
+    control: .76 + density * .20,
+    toolbar: .78 + density * .18,
+    backgroundBlur: 8 + density * 16
   };
 };
 
 export const applySurfaceSettings = (opacity: number) => {
-  const safeOpacity = clampSurfaceOpacity(opacity);
-  const material = getLiquidGlassMaterial(safeOpacity);
+  const value = clampSurfaceOpacity(opacity);
+  const material = getMaterialSurfaces(value);
   const root = document.documentElement;
-  root.style.setProperty("--surface-opacity-scale", String(safeOpacity / 50));
-  root.style.setProperty("--surface-opacity", String(safeOpacity / 100));
-  root.style.setProperty("--surface-fill", String(Math.pow(safeOpacity / 100, 1.65)));
-  root.style.setProperty("--glass-blur", `${material.blur}px`);
-  root.style.setProperty("--glass-specular-strength", String(material.specular));
+  root.style.setProperty("--surface-opacity", String(value / 100));
+  root.style.setProperty("--surface-fill", String(material.window));
+  root.style.setProperty("--material-content-opacity", String(material.content));
+  root.style.setProperty("--material-control-opacity", String(material.control));
+  root.style.setProperty("--material-toolbar-opacity", String(material.toolbar));
+  root.style.setProperty("--material-background-blur", `${material.backgroundBlur}px`);
 };
 
 export const initializeAppearance = () => {
   let theme = DEFAULT_THEME;
   let mode = "system";
+  let opacity = 50;
   try {
     theme = localStorage.getItem("tiez_theme") || DEFAULT_THEME;
     mode = localStorage.getItem("tiez_color_mode") || "system";
+    opacity = Number(localStorage.getItem("tiez_surface_opacity") ?? 50);
   } catch { /* SQLite settings will still load after startup. */ }
+  applySurfaceSettings(opacity);
   applyThemeClasses(theme, document.documentElement, document.body);
   applyColorMode(mode === "dark" || (mode !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches)
     ? "dark" : "light");

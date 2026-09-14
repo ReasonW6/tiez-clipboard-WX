@@ -1,10 +1,4 @@
-type CompactPreviewControls = {
-  forceHide: () => void;
-  warmup: () => void;
-  supported: () => boolean;
-  warmupSupported: () => boolean;
-};
-
+type CompactPreviewControls = { forceHide: () => void };
 let controls: CompactPreviewControls | null = null;
 
 export const registerCompactPreviewControls = (next: CompactPreviewControls) => {
@@ -14,13 +8,3 @@ export const registerCompactPreviewControls = (next: CompactPreviewControls) => 
 export const forceHideCompactPreviewWindow = () => {
   controls?.forceHide();
 };
-
-export const warmupCompactPreviewWindow = () => {
-  controls?.warmup();
-};
-
-export const isCompactPreviewWindowSupported = () =>
-  controls?.supported() ?? false;
-
-export const isCompactPreviewWarmupSupported = () =>
-  controls?.warmupSupported() ?? false;

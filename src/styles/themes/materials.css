@@ -2,13 +2,13 @@
 :is(:root, body):where(.theme-mica, .theme-acrylic, .theme-liquid-glass) {
   --bg-body: transparent;
   --bg-content: transparent;
-  --bg-toolbar: transparent;
+  --bg-toolbar: rgba(248,250,253,var(--material-toolbar-opacity));
   --accent-color: #356ad8;
   --accent-color-rgb: 53, 106, 216;
   --accent-hover: #285bbf;
   --text-primary: #202631;
-  --text-secondary: #586374;
-  --text-muted: #697586;
+  --text-secondary: #4c596d;
+  --text-muted: #5b6674;
   --material-solid: #f3f5f8;
   --line-soft: rgba(44,56,76,.1);
   --line-strong: rgba(44,56,76,.18);
@@ -39,7 +39,7 @@
   --card-shadow: var(--shadow-xs);
   --card-hover-shadow: var(--shadow-sm);
   --card-hover-transform: none;
-  --card-selected-background: rgba(var(--accent-color-rgb),.1);
+  --card-selected-background: #e8f0fd;
   --card-selected-border-color: rgba(var(--accent-color-rgb),.4);
   --card-selected-shadow: none;
   --panel-border: 1px solid var(--line-soft);
@@ -66,8 +66,9 @@
 :is(:root, body):where(.theme-mica, .theme-acrylic, .theme-liquid-glass).dark-mode {
   --bg-body: transparent;
   --bg-content: transparent;
-  --bg-toolbar: transparent;
+  --bg-toolbar: rgba(29,36,47,var(--material-toolbar-opacity));
   --text-primary: #f0f2f6;
+  --card-selected-background: #233750;
   --text-secondary: #b0b8c6;
   --text-muted: #a1acbd;
   --material-solid: #232731;
@@ -90,9 +91,10 @@ body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) { position: relative; 
 body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass).has-custom-bg::before {
   content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
   background: var(--custom-bg-image) center / cover no-repeat; opacity: var(--custom-bg-opacity,.45);
+  filter: blur(var(--material-background-blur)); transform: scale(1.08);
 }
 body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) #root { position: relative; }
-body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) .settings-group { box-shadow: none; }
+body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) .settings-group { box-shadow: none; backdrop-filter: none; }
 body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) .tm-dialog { background: var(--material-solid); }
 body.windows-10:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) { --bg-window: var(--material-solid); }
 body.compact-preview:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) #root {
@@ -100,8 +102,8 @@ body.compact-preview:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) #root 
 }
 @media (prefers-reduced-transparency: reduce) {
   :root:is(.theme-mica, .theme-acrylic, .theme-liquid-glass), body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) {
-    --bg-window: var(--material-solid) !important; --glass-blur: 0px !important; --glass-fill: var(--material-solid) !important;
-    --surface-fill: 1 !important; --shell-backdrop-filter: none !important;
+    --bg-window: var(--material-solid) !important; --material-background-blur: 0px !important;
+    --surface-fill: 1 !important; --material-content-opacity: 1 !important; --material-control-opacity: 1 !important; --material-toolbar-opacity: 1 !important; --shell-backdrop-filter: none !important;
   }
 }
 
@@ -114,7 +116,16 @@ body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) :is(.btn-icon, .theme-
 @media (forced-colors: active) {
   :root:is(.theme-mica, .theme-acrylic, .theme-liquid-glass), body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) {
     --bg-window: Canvas !important; --bg-panel: Canvas !important; --bg-element: Canvas !important; --bg-input: Canvas !important; --bg-button: Canvas !important;
-    --glass-fill: Canvas !important; --material-solid: Canvas !important; --text-primary: CanvasText !important; --text-secondary: CanvasText !important;
-    --line-soft: ButtonText !important; --line-strong: Highlight !important; --accent-color: Highlight !important; --glass-blur: 0px !important;
+     --material-solid: Canvas !important; --text-primary: CanvasText !important; --text-secondary: CanvasText !important;
+    --line-soft: ButtonText !important; --line-strong: Highlight !important; --accent-color: Highlight !important; --material-background-blur: 0px !important;
   }
+}
+
+body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) .search-input::placeholder { color: var(--text-secondary); opacity: 1; }
+body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass, .theme-sakura) .empty-state-message {
+  max-width: calc(100% - 32px); padding: 22px 26px; border-radius: 16px;
+  background: var(--bg-panel); border: var(--panel-border);
+}
+@media (prefers-reduced-motion: reduce) {
+  body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) :is(.btn-icon, .theme-choice, .tm-tag, .segment-btn) { transition: none; }
 }

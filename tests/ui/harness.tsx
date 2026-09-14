@@ -13,11 +13,12 @@ const params = new URLSearchParams(location.search);
 const settings: Record<string, string> = {
   "app.theme": params.get("theme") || "acrylic",
   "app.color_mode": params.get("mode") || "light",
-  "app.surface_opacity": "50", "app.language": "zh",
+  "app.surface_opacity": params.get("opacity") || "50", "app.language": "zh",
   "app.tag_manager_enabled": "true", "app.show_app_border": "true", "app.window_pinned": "true",
   "app.show_search_box": "true", "app.capture_files": "true", "app.arrow_key_selection": "true"
 };
 Object.assign(settings, JSON.parse(localStorage.getItem("fixture-settings") || "{}"));
+if (params.has("opacity")) settings["app.surface_opacity"] = params.get("opacity")!;
 const samples = [
   ["工作", "设计评审记录\n统一组件间距，检查浅色与深色模式下的文字对比度。"],
   ["工作", "npm run build"],
@@ -40,7 +41,7 @@ mockConvertFileSrc("windows");
 mockIPC(async (command, args: any = {}) => {
   calls.push({ command, args });
   switch (command) {
-    case "get_settings": return { ...settings };
+    case "get_settings": await pause(Number(params.get("settingsDelay") || "0")); return { ...settings };
     case "save_setting": settings[args.key] = args.value; localStorage.setItem("fixture-settings", JSON.stringify(settings)); return null;
     case "get_platform_info": return { platform: "windows", is_windows_10: params.get("win10") === "true", is_windows_11: params.get("win10") !== "true" };
     case "set_theme": await pause(args.colorMode === "dark" ? 80 : 5); theme = args.colorMode === "system" ? "dark" : args.colorMode; return null;

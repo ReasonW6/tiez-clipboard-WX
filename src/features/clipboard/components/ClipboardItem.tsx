@@ -54,7 +54,6 @@ const IS_MACOS =
     typeof navigator !== "undefined" &&
     (/Mac|iPhone|iPad|iPod/i.test(navigator.userAgent) || /Mac/i.test(navigator.platform));
 const COMPACT_PREVIEW_WINDOW_SUPPORTED = true;
-const COMPACT_PREVIEW_WARMUP_SUPPORTED = !IS_MACOS;
 const compactPreviewLog = (...args: unknown[]) => {
     if (!COMPACT_PREVIEW_DEBUG) return;
     const ts = new Date().toISOString();
@@ -576,30 +575,7 @@ const ensureCompactPreviewWindow = async (): Promise<WebviewWindow | null> => {
     return compactPreviewReady;
 };
 
-/**
- * Pre-warm the compact preview window so it's ready before the user hovers.
- * On macOS we deliberately skip warmup to reduce startup-time UI stalls.
- */
-const warmupCompactPreviewWindow = () => {
-    if (!COMPACT_PREVIEW_WINDOW_SUPPORTED || !COMPACT_PREVIEW_WARMUP_SUPPORTED) return;
-    // Only warm up if not already created/creating
-    if (compactPreviewWindow || compactPreviewCreating || compactPreviewReady) return;
-    compactPreviewLog("warmup: pre-creating compact preview window");
-    // Fire and forget - creates the window in the background
-    ensureCompactPreviewWindow().catch((err) => {
-        compactPreviewLog("warmup: failed", err);
-    });
-};
-
-const isCompactPreviewWindowSupported = () => COMPACT_PREVIEW_WINDOW_SUPPORTED;
-const isCompactPreviewWarmupSupported = () => COMPACT_PREVIEW_WARMUP_SUPPORTED;
-
-registerCompactPreviewControls({
-    forceHide: forceHideCompactPreviewWindow,
-    warmup: warmupCompactPreviewWindow,
-    supported: isCompactPreviewWindowSupported,
-    warmupSupported: isCompactPreviewWarmupSupported,
-});
+registerCompactPreviewControls({ forceHide: forceHideCompactPreviewWindow });
 
 const getIcon = (type: string) => {
     switch (type) {

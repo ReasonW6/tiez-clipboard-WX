@@ -359,6 +359,7 @@ const AppearanceSettingsGroup = ({
                                 min="0"
                                 max="100"
                                 aria-label={t(theme === 'liquid-glass' ? 'glass_transparency' : 'surface_opacity')}
+                                className={theme === 'liquid-glass' ? 'glass-transparency-slider' : undefined}
                                 value={theme === 'liquid-glass' ? 100 - surfaceOpacity : surfaceOpacity}
                                 onChange={(e) => {
                                     const val = theme === 'liquid-glass' ? 100 - Number(e.target.value) : Number(e.target.value);

@@ -46,7 +46,6 @@ import { useWindowSessionReset } from "./shared/hooks/useWindowSessionReset";
 import { useAutoUpdate } from "./shared/hooks/useAutoUpdate";
 import UpdateDialog from "./shared/components/UpdateDialog";
 import { MotionConfig } from "framer-motion";
-import LiquidGlassEffects from "./shared/components/LiquidGlassEffects";
 import type { ClipboardEntry } from "./shared/types";
 import type { QuickPasteHint, VirtualClipboardListHandle } from "./features/clipboard/types";
 
@@ -55,9 +54,6 @@ const BUILTIN_SENSITIVE_TAG_NAMES = ["sensitive", "密码", "password"] as const
 import type { QuickPasteModifier } from "./features/app/types";
 import {
   forceHideCompactPreviewWindow,
-  isCompactPreviewWindowSupported,
-  isCompactPreviewWarmupSupported,
-  warmupCompactPreviewWindow
 } from "./features/clipboard/lib/compactPreviewControls";
 import { isMacPlatform } from "./shared/lib/platform";
 import { isTauriRuntime } from "./shared/lib/tauriRuntime";
@@ -562,7 +558,8 @@ const App = () => {
     setInstalledApps,
     setAutoStart,
     setDefaultApps,
-    setWinClipboardDisabled
+    setWinClipboardDisabled,
+    loadAppAssociations: showSettings && (!appState.collapsedGroups.default_apps || settingsSubpage === "advanced")
   });
 
   useWindowPinnedListener({
@@ -582,16 +579,6 @@ const App = () => {
     surfaceOpacity,
     showAppBorder,
   });
-
-  // Pre-warm compact preview window only where warmup is safe.
-  // macOS keeps hover preview enabled but skips warmup to reduce UI stalls.
-  useEffect(() => {
-    if (!compactMode || !isCompactPreviewWindowSupported() || !isCompactPreviewWarmupSupported()) return;
-    const timer = setTimeout(() => {
-      warmupCompactPreviewWindow();
-    }, 2000); // 2s delay: avoids impacting app startup performance
-    return () => clearTimeout(timer);
-  }, [compactMode]);
 
   useEffect(() => {
     if (!isTauriRuntime()) return;
@@ -678,6 +665,7 @@ const App = () => {
     try {
       if (type === 'theme') localStorage.setItem('tiez_theme', path);
       if (type === 'color_mode') localStorage.setItem('tiez_color_mode', path);
+      if (type === 'surface_opacity') localStorage.setItem('tiez_surface_opacity', path);
       if (type === 'compact_mode') localStorage.setItem('tiez_compact_mode', path);
     } catch (e) {
       // Ignore localStorage errors
@@ -861,11 +849,10 @@ const App = () => {
   });
 
   return (
-    <MotionConfig reducedMotion="user" transition={{ type: "spring", stiffness: 420, damping: 32, mass: .8 }}>
+    <MotionConfig reducedMotion="user">
     <div
       className="app-container"
     >
-      <LiquidGlassEffects theme={theme} opacity={surfaceOpacity} />
       <AppHeader
         t={t}
         showSettings={showSettings}

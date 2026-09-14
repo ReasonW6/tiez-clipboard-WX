@@ -226,7 +226,7 @@ body.theme-sakura #root > * {
     --shadow-lg: 0 20px 44px rgba(0, 0, 0, 0.3);
     --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 
-    --shell-background: rgba(28, 20, 23, calc(0.9 * var(--surface-opacity-scale, 1)));
+    --shell-background: rgba(28, 20, 23, var(--surface-fill));
     --shell-border: 1px solid rgba(255, 255, 255, 0.06);
     --shell-shadow: 0 16px 40px rgba(0, 0, 0, 0.3);
 
@@ -284,7 +284,7 @@ body.dark-mode.theme-sakura {
   --shadow-lg: 0 20px 44px rgba(0, 0, 0, 0.3);
   --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 
-  --shell-background: rgba(28, 20, 23, calc(0.9 * var(--surface-opacity-scale, 1)));
+  --shell-background: rgba(28, 20, 23, var(--surface-fill));
   --shell-border: 1px solid rgba(255, 255, 255, 0.06);
   --shell-shadow: 0 16px 40px rgba(0, 0, 0, 0.3);
 
@@ -326,14 +326,17 @@ body.dark-mode.theme-sakura::before {
 
 /* Match the complete opacity range of the other translucent themes. */
 :root.theme-sakura, body.theme-sakura {
-  --bg-panel: rgba(255,245,248,calc(.04 + var(--surface-fill) * .96));
-  --bg-input: rgba(255,255,255,calc(.1 + var(--surface-fill) * .9));
-  --bg-element: rgba(255,235,240,calc(.04 + var(--surface-fill) * .96));
-  --bg-button: rgba(255,255,255,calc(.05 + var(--surface-fill) * .95));
+  --bg-panel: rgba(255,245,248,var(--material-content-opacity));
+  --bg-input: rgba(255,255,255,var(--material-control-opacity));
+  --bg-element: rgba(255,245,248,var(--material-content-opacity));
+  --bg-button: rgba(255,255,255,var(--material-control-opacity));
 }
 :root.theme-sakura.dark-mode, body.theme-sakura.dark-mode {
-  --bg-panel: rgba(49,31,42,calc(.04 + var(--surface-fill) * .96));
-  --bg-input: rgba(57,35,47,calc(.1 + var(--surface-fill) * .9));
-  --bg-element: rgba(49,31,42,calc(.04 + var(--surface-fill) * .96));
-  --bg-button: rgba(57,35,47,calc(.05 + var(--surface-fill) * .95));
+  --bg-panel: rgba(49,31,42,var(--material-content-opacity));
+  --bg-input: rgba(57,35,47,var(--material-control-opacity));
+  --bg-element: rgba(49,31,42,var(--material-content-opacity));
+  --bg-button: rgba(57,35,47,var(--material-control-opacity));
 }
+
+:root.theme-sakura, body.theme-sakura { --shell-backdrop-filter: none; --bg-toolbar: rgba(255,245,248,var(--material-toolbar-opacity)); }
+:root.theme-sakura.dark-mode, body.theme-sakura.dark-mode { --bg-toolbar: rgba(49,31,42,var(--material-toolbar-opacity)); }

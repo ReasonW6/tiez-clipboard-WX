@@ -157,6 +157,7 @@ const AdvancedSettingsWindow = () => {
     });
 
     useAppBootstrap({
+        loadAppAssociations: true,
         setDataPath,
         setInstalledApps,
         setAutoStart,

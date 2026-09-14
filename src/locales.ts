@@ -23,7 +23,7 @@ export const translations = {
         tm_uses: "次",
         tm_selected: "已选 {count} 项",
         glass_transparency: "液态玻璃透明度",
-        glass_transparency_hint: "向右更清透，向左更磨砂，玻璃质感随透明度一起变化。",
+        glass_transparency_hint: "向右更清透，向左更柔和；文字区域始终保留清晰底色。",
         glass_clear: "清透",
         glass_soft: "磨砂",
         // App Selector
@@ -391,7 +391,7 @@ export const translations = {
         tm_uses: "uses",
         tm_selected: "{count} selected",
         glass_transparency: "Liquid Glass transparency",
-        glass_transparency_hint: "Slide right for clear glass or left for a frosted finish. The material adjusts together.",
+        glass_transparency_hint: "Slide right for a clearer finish or left for a softer one. Text keeps a readable surface.",
         glass_clear: "Clear",
         glass_soft: "Frosted",
         // App Selector
@@ -762,7 +762,7 @@ export const translations = {
         tm_uses: "次",
         tm_selected: "已選 {count} 項",
         glass_transparency: "液態玻璃透明度",
-        glass_transparency_hint: "向右更清透，向左更磨砂，玻璃質感隨透明度一起變化。",
+        glass_transparency_hint: "向右更清透，向左更柔和；文字區域始終保留清晰底色。",
         glass_clear: "清透",
         glass_soft: "磨砂",
         // App Selector

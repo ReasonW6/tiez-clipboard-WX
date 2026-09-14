@@ -38,7 +38,11 @@
   --spacing-md: 16px;
   --spacing-sm: 8px;
   --surface-opacity-scale: 1;
-  --surface-fill: 0.319;
+  --surface-fill: 0.59;
+  --material-content-opacity: 0.94;
+  --material-control-opacity: 0.86;
+  --material-toolbar-opacity: 0.87;
+  --material-background-blur: 16px;
 
   --font-main: "Segoe UI", "Inter", "Microsoft YaHei", sans-serif;
   --font-mono: "Cascadia Code", "Consolas", monospace;
@@ -362,3 +366,6 @@ body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass, .theme-sakura) .app-co
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; }
 }
+
+.panel-loading { display: grid; min-height: 120px; place-items: center; color: var(--text-secondary); font-size: 13px; }
+.empty-state-message { display: flex; flex-direction: column; align-items: center; text-align: center; }

@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ComponentProps, RefObject, ReactNode } from "react";
 import { motion, Reorder, useDragControls } from "framer-motion";
 import type { DragControls } from "framer-motion";
 import { ArrowUp, Clipboard } from "lucide-react";
-import SettingsPanel from "../../settings/components/SettingsPanel";
-import TagManager from "../../tag/components/TagManager";
-import EmojiPanel from "../../emoji/components/EmojiPanel";
 import { VirtualClipboardList } from "../../clipboard/components/VirtualClipboardList";
 import type { ClipboardEntry } from "../../../shared/types";
 import type { VirtualClipboardListHandle } from "../../clipboard/types";
+
+const SettingsPanel = lazy(() => import("../../settings/components/SettingsPanel"));
+const TagManager = lazy(() => import("../../tag/components/TagManager"));
+const EmojiPanel = lazy(() => import("../../emoji/components/EmojiPanel"));
 
 type SettingsPanelProps = ComponentProps<typeof SettingsPanel>;
 type RenderItem = (
@@ -186,11 +187,12 @@ const AppMainContent = ({
   if (showTagManager && tagManagerEnabled) {
     return (
       <motion.div
-        initial={{ opacity: 0, y: 12, scale: .985 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: .18, ease: [.22, 1, .36, 1] }}
         style={{ height: "100%" }}
       >
-        <TagManager t={t} theme={theme} />
+        <Suspense fallback={<div className="panel-loading" role="status">{t("loading")}</div>}><TagManager t={t} theme={theme} /></Suspense>
       </motion.div>
     );
   }
@@ -198,10 +200,12 @@ const AppMainContent = ({
   if (showEmojiPanel) {
     return (
       <motion.div
-        initial={{ opacity: 0, y: 12, scale: .985 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: .18, ease: [.22, 1, .36, 1] }}
         style={{ height: "100%", overflow: "hidden" }}
       >
+        <Suspense fallback={<div className="panel-loading" role="status">{t("loading")}</div>}>
         <EmojiPanel
           t={t}
           favorites={emojiFavorites}
@@ -210,6 +214,7 @@ const AppMainContent = ({
           setActiveTab={setEmojiPanelTab}
           saveSetting={saveSetting}
         />
+        </Suspense>
       </motion.div>
     );
   }
@@ -218,8 +223,9 @@ const AppMainContent = ({
 
     return (
       <motion.div
-        initial={{ opacity: 0, y: 12, scale: .985 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: .18, ease: [.22, 1, .36, 1] }}
         className={`settings-view ${settingsPanelProps.settingsSubpage === "advanced" ? "advanced-view-shell" : ""}`}
         style={{
           display: "flex",
@@ -231,14 +237,14 @@ const AppMainContent = ({
           maxWidth: settingsPanelProps.settingsSubpage === "advanced" ? "none" : undefined
         }}
       >
-        <SettingsPanel {...settingsPanelProps} />
+        <Suspense fallback={<div className="panel-loading" role="status">{t("loading")}</div>}><SettingsPanel {...settingsPanelProps} /></Suspense>
       </motion.div>
     );
   }
 
   if (filteredHistory.length === 0) {
     return (
-      <div className="empty-state">
+      <div className="empty-state"><div className="empty-state-message">
         <Clipboard size={40} opacity={0.2} style={{ marginBottom: "12px" }} />
         {search ? (
           <p>{t("no_records")}</p>
@@ -257,7 +263,7 @@ const AppMainContent = ({
             <p style={{ fontSize: "12px", opacity: 0.6 }}>{t("empty_desc")}</p>
           </>
         )}
-      </div>
+      </div></div>
     );
   }
 

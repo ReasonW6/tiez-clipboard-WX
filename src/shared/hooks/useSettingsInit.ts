@@ -56,6 +56,7 @@ export const useSettingsInit = ({
           try {
             localStorage.setItem("tiez_theme", loadedTheme);
             localStorage.setItem("tiez_color_mode", loadedColorMode);
+            localStorage.setItem("tiez_surface_opacity", result["app.surface_opacity"] ?? "50");
             localStorage.setItem(
               "tiez_compact_mode",
               result["app.compact_mode"] === "true" ? "true" : "false"

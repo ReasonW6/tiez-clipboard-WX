@@ -109,8 +109,8 @@ Theme layer responsibilities:
 Examples:
 
 - `retro.css` restores hard borders, pressed buttons, segmented mechanical switch, uppercase labels
-- `mica.css` keeps the UI soft and translucent, with noise texture but no blur shell
-- `acrylic.css` adds glass blur and highlight overlays
+- `mica.css` uses a stable native Mica backdrop with readable content surfaces
+- `acrylic.css` uses native Acrylic with a continuous tint range; foreground text is unfiltered
 
 ### 3. Native layer
 
@@ -344,8 +344,8 @@ Valid selector override example:
 Examples:
 
 - paper texture belongs in `paper.css`
-- mica noise layer belongs in `mica.css`
-- acrylic blur highlight belongs in `acrylic.css`
+- mica surface colors belong in `mica.css`
+- acrylic material colors belong in `acrylic.css`
 - retro mechanical switch belongs in `retro.css`
 
 ### Rule 4: labels live in `themes.ts`
@@ -465,3 +465,7 @@ The main shared UI layer has been normalized, but a few feature-local styles sti
 - `src/styles/components/file-transfer.css`
 
 These files are now the exception, not the base theme system.
+
+## Material rendering constraints
+
+See [MATERIAL-DESIGN.md](MATERIAL-DESIGN.md) for the current material mapping, primary design references, startup work, and measured checks. Material opacity must not switch native backdrops at an endpoint. Keep text outside optical filters and preserve readable content surfaces.

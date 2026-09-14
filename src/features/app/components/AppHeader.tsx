@@ -157,7 +157,7 @@ const AppHeader = ({
     </div>
 
     {!showSettings && !showTagManager && !showEmojiPanel && (
-      <AnimatePresence>
+      <AnimatePresence initial={false}>
         {(showSearchBox || search.trim().length > 0) && (
           <motion.div
             initial={{ height: 0, opacity: 0, overflow: 'hidden' }}
@@ -259,7 +259,7 @@ const AppHeader = ({
                       borderRadius: theme === 'liquid-glass' ? '999px' : '4px',
                       whiteSpace: 'nowrap',
                       flexShrink: 0,
-                      opacity: typeFilter === t ? 1 : 0.7
+                      opacity: 1
                     }}
                     title={getTypeName(t)}
                   >

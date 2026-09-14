@@ -9,11 +9,13 @@ use std::path::Path;
 use std::process::Command;
 use std::sync::{Mutex, OnceLock};
 use windows::core::{PCWSTR, PWSTR};
+use windows::Win32::Foundation::RPC_E_CHANGED_MODE;
 use windows::Win32::Graphics::Gdi::{
     CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject, SelectObject, BITMAPINFO,
     BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HGDIOBJ, RGBQUAD,
 };
 use windows::Win32::Storage::FileSystem::{FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_NORMAL};
+use windows::Win32::System::Com::{CoInitializeEx, CoUninitialize, COINIT_APARTMENTTHREADED};
 use windows::Win32::UI::Shell::{
     AssocQueryStringW, ExtractIconExW, SHGetFileInfoW, ASSOCF_VERIFY, ASSOCSTR_EXECUTABLE,
     ASSOCSTR_FRIENDLYAPPNAME, SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON, SHGFI_USEFILEATTRIBUTES,
@@ -32,8 +34,39 @@ pub struct AppInfo {
 static EXECUTABLE_ICON_CACHE: OnceLock<Mutex<HashMap<String, Option<String>>>> = OnceLock::new();
 static FILE_ICON_CACHE: OnceLock<Mutex<HashMap<String, Option<String>>>> = OnceLock::new();
 
+// Shell lookups can load handlers and touch disk. Never run them on the UI thread.
+async fn on_shell_worker<T: Send + 'static>(
+    work: impl FnOnce() -> AppResult<T> + Send + 'static,
+) -> AppResult<T> {
+    tauri::async_runtime::spawn_blocking(move || {
+        struct ComGuard;
+        impl Drop for ComGuard {
+            fn drop(&mut self) {
+                unsafe { CoUninitialize() };
+            }
+        }
+        let result = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) };
+        let _com = if result.is_ok() {
+            Some(ComGuard)
+        } else if result == RPC_E_CHANGED_MODE {
+            None // This worker already has COM initialized; do not uninitialize it.
+        } else {
+            return Err(AppError::Internal(format!(
+                "Initialize shell COM: {result:?}"
+            )));
+        };
+        work()
+    })
+    .await
+    .map_err(|error| AppError::Internal(format!("Shell worker: {error}")))?
+}
+
 #[tauri::command]
 pub async fn scan_installed_apps() -> AppResult<Vec<AppInfo>> {
+    on_shell_worker(scan_installed_apps_blocking).await
+}
+
+fn scan_installed_apps_blocking() -> AppResult<Vec<AppInfo>> {
     let mut apps = Vec::new();
     println!("Starting app scan...");
 
@@ -250,7 +283,11 @@ pub async fn get_associated_apps(extension: String) -> AppResult<Vec<AppInfo>> {
 }
 
 #[tauri::command]
-pub fn get_system_default_app(content_type: String) -> AppResult<String> {
+pub async fn get_system_default_app(content_type: String) -> AppResult<String> {
+    on_shell_worker(move || get_system_default_app_blocking(content_type)).await
+}
+
+fn get_system_default_app_blocking(content_type: String) -> AppResult<String> {
     let ext = match content_type.as_str() {
         "image" => ".png",
         "video" => ".mp4",
@@ -317,7 +354,11 @@ pub fn get_system_default_app(content_type: String) -> AppResult<String> {
 use std::os::windows::ffi::OsStrExt;
 
 #[tauri::command]
-pub fn get_executable_icon(executable_path: String) -> AppResult<Option<String>> {
+pub async fn get_executable_icon(executable_path: String) -> AppResult<Option<String>> {
+    on_shell_worker(move || get_executable_icon_blocking(executable_path)).await
+}
+
+fn get_executable_icon_blocking(executable_path: String) -> AppResult<Option<String>> {
     let cache_key = normalize_icon_cache_key(&executable_path);
     if cache_key.is_empty() {
         return Ok(None);
@@ -342,7 +383,11 @@ pub fn get_executable_icon(executable_path: String) -> AppResult<Option<String>>
 }
 
 #[tauri::command]
-pub fn get_file_icon(file_path: String) -> AppResult<Option<String>> {
+pub async fn get_file_icon(file_path: String) -> AppResult<Option<String>> {
+    on_shell_worker(move || get_file_icon_blocking(file_path)).await
+}
+
+fn get_file_icon_blocking(file_path: String) -> AppResult<Option<String>> {
     let cache_key = normalize_file_icon_cache_key(&file_path);
     if cache_key.is_empty() {
         return Ok(None);
@@ -679,5 +724,51 @@ pub async fn launch_uwp_with_file(app_id: &str, file_path: &str) -> AppResult<()
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr);
         Err(format!("WinRT Launch failed: {}", stderr.trim()).into())
+    }
+}
+
+#[cfg(test)]
+mod worker_tests {
+    use super::*;
+
+    #[test]
+    fn shell_work_runs_off_the_calling_thread() {
+        let caller = std::thread::current().id();
+        let worker =
+            tauri::async_runtime::block_on(on_shell_worker(|| Ok(std::thread::current().id())))
+                .expect("shell worker");
+        assert_ne!(caller, worker);
+    }
+
+    #[test]
+    fn background_icon_lookup_keeps_png_and_cache_results() {
+        let root = std::env::var("SystemRoot").expect("Windows system directory");
+        let path = Path::new(&root)
+            .join("System32")
+            .join("cmd.exe")
+            .to_string_lossy()
+            .into_owned();
+        tauri::async_runtime::block_on(async {
+            let first = get_executable_icon(path.clone())
+                .await
+                .unwrap()
+                .expect("system executable icon");
+            let second = get_executable_icon(path.clone()).await.unwrap().unwrap();
+            assert_eq!(first, second);
+            let file = get_file_icon(path)
+                .await
+                .unwrap()
+                .expect("system file icon");
+            for data in [first, file] {
+                let bytes = base64::engine::general_purpose::STANDARD
+                    .decode(
+                        data.strip_prefix("data:image/png;base64,")
+                            .expect("PNG URL"),
+                    )
+                    .unwrap();
+                let image = image::load_from_memory(&bytes).expect("valid PNG");
+                assert!(image.width() > 0 && image.height() > 0);
+            }
+        });
     }
 }

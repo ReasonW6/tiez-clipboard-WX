@@ -1,26 +1,21 @@
 import { expect, it } from "vitest";
-import { getLiquidGlassMaterial, nativeBackdropEnabled } from "./appearance";
+import { getMaterialSurfaces } from "./appearance";
 
-it("one value moves the complete material from clear to frosted", () => {
-  const clear = getLiquidGlassMaterial(0), frosted = getLiquidGlassMaterial(100);
-  expect(clear.blur).toBe(0);
-  expect(frosted.blur).toBe(64);
-  expect(clear.specular).toBeGreaterThan(frosted.specular);
-  expect(clear.refraction).toBeGreaterThan(frosted.refraction);
-  expect(getLiquidGlassMaterial(50).blur).toBeCloseTo(18, 0);
-  let previous = 0;
-  for (let opacity = 0; opacity <= 100; opacity++) {
-    const material = getLiquidGlassMaterial(opacity);
-    expect(material.blur).toBeGreaterThanOrEqual(previous);
-    previous = material.blur;
+it("keeps both endpoints on the same continuous material curve", () => {
+  const stops = [0, 1, 25, 50, 75, 99, 100].map(getMaterialSurfaces);
+  expect(stops[0].window).toBeGreaterThan(.2);
+  expect(stops[stops.length - 1].window).toBeGreaterThan(.94);
+  expect(stops[1].window - stops[0].window).toBeLessThan(.01);
+  expect(stops[stops.length - 1].window - stops[stops.length - 2].window).toBeLessThan(.01);
+  for (let i = 1; i < stops.length; i++) {
+    expect(stops[i].window).toBeGreaterThan(stops[i - 1].window);
+    expect(stops[i].content).toBeGreaterThanOrEqual(.9);
+    expect(stops[i].control).toBeGreaterThanOrEqual(.76);
   }
-  expect(getLiquidGlassMaterial(-5)).toEqual(clear);
-  expect(getLiquidGlassMaterial(999)).toEqual(frosted);
-  expect(getLiquidGlassMaterial(Number.NaN)).toEqual(getLiquidGlassMaterial(50));
 });
 
-it("the clear endpoint removes the native backdrop rather than just its tint", () => {
-  expect(nativeBackdropEnabled(0)).toBe(false);
-  expect(nativeBackdropEnabled(100)).toBe(true);
-  expect(nativeBackdropEnabled(Number.NaN)).toBe(true);
+it("keeps a safe default and bounds invalid stored settings", () => {
+  expect(getMaterialSurfaces(-1)).toEqual(getMaterialSurfaces(0));
+  expect(getMaterialSurfaces(101)).toEqual(getMaterialSurfaces(100));
+  expect(getMaterialSurfaces(Number.NaN)).toEqual(getMaterialSurfaces(50));
 });
