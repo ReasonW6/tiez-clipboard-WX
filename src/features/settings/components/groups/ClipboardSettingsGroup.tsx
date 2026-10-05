@@ -1,3 +1,5 @@
+import SettingsGlassField from "../SettingsGlassField";
+import GlassLens from "../../../../shared/components/GlassLens";
 import { useEffect, useState } from "react";
 import type { ComponentType, ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
@@ -80,6 +82,7 @@ interface ClipboardSettingsGroupProps {
 }
 
 const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
+    const { theme } = props;
     const quickPasteOptions: Array<{ value: QuickPasteModifier; label: string }> = isMacPlatform()
         ? [
             { value: "disabled", label: props.t("quick_paste_modifier_disabled") },
@@ -122,15 +125,15 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
     const renderHotkeyCaps = (hotkey: string) => {
         const tokens = getHotkeyDisplayTokens(hotkey);
         if (tokens.length === 0) {
-            return <div className="key-cap" style={{ width: '8em', opacity: 0.5 }}>{props.t('not_set')}</div>;
+            return <div className="key-cap" style={{ width: '8em', opacity: 0.5 }}>{theme === "liquid-glass" && <GlassLens radius={12} />}{props.t('not_set')}</div>;
         }
         const label = tokens.map((token) => token.label).join(isMacPlatform() ? " " : " + ");
-        return <div className="key-cap key-cap-chord" title={label}>{label}</div>;
+        return <div className="key-cap key-cap-chord" title={label}>{theme === "liquid-glass" && <GlassLens radius={12} />}{label}</div>;
     };
 
     return (
         <div className={`settings-group ${props.collapsed ? 'collapsed' : ''}`}>
-            <div className="group-header" onClick={props.onToggle}>
+            <div className="group-header" onClick={props.onToggle}>{theme === "liquid-glass" && <GlassLens radius={12} />}
                 <h3 style={{ margin: 0 }}>{props.t('clipboard_settings')}</h3>
                 {props.collapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
             </div>
@@ -149,7 +152,7 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
                                 checked={props.persistent}
                                 onChange={(e) => props.setPersistent(e.target.checked)}
                             />
-                            <div className="toggle"><div className="left" /><div className="right" /></div>
+                            <div className="toggle">{theme === "liquid-glass" && <GlassLens radius={12} />}<div className="left" /><div className="right" /></div>
                         </label>
                     </div>
                     {props.persistent && (
@@ -170,7 +173,7 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
                                             props.saveAppSetting('persistent_limit_enabled', e.target.checked.toString());
                                         }}
                                     />
-                                    <div className="toggle"><div className="left" /><div className="right" /></div>
+                                    <div className="toggle">{theme === "liquid-glass" && <GlassLens radius={12} />}<div className="left" /><div className="right" /></div>
                                 </label>
                             </div>
                             {props.persistentLimitEnabled && (
@@ -180,7 +183,7 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
                                         hint={props.t('persistent_limit_hint')}
                                         hintKey="persistent_limit"
                                     />
-                                    <input
+                                    <SettingsGlassField theme={theme}><input
                                         type="number"
                                         value={persistentLimitDraft}
                                         onFocus={(e) => {
@@ -214,7 +217,7 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
                                             color: 'var(--text-color)',
                                             fontSize: '14px'
                                         }}
-                                    />
+                                    /></SettingsGlassField>
                                 </div>
                             )}
                         </>
@@ -232,7 +235,7 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
                                 checked={props.deduplicate}
                                 onChange={(e) => props.setDeduplicate(e.target.checked)}
                             />
-                            <div className="toggle"><div className="left" /><div className="right" /></div>
+                            <div className="toggle">{theme === "liquid-glass" && <GlassLens radius={12} />}<div className="left" /><div className="right" /></div>
                         </label>
                     </div>
                     <div className="setting-item">
@@ -246,7 +249,7 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
                                 checked={props.captureFiles}
                                 onChange={(e) => props.setCaptureFiles(e.target.checked)}
                             />
-                            <div className="toggle"><div className="left" /><div className="right" /></div>
+                            <div className="toggle">{theme === "liquid-glass" && <GlassLens radius={12} />}<div className="left" /><div className="right" /></div>
                         </label>
                     </div>
                     <div className="setting-item">
@@ -265,7 +268,7 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
                                     props.setCaptureRichText(val);
                                 }}
                             />
-                            <div className="toggle"><div className="left" /><div className="right" /></div>
+                            <div className="toggle">{theme === "liquid-glass" && <GlassLens radius={12} />}<div className="left" /><div className="right" /></div>
                         </label>
                     </div>
                     <div className="setting-item">
@@ -285,7 +288,7 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
                                     props.saveAppSetting('rich_text_snapshot_preview', String(val));
                                 }}
                             />
-                            <div className="toggle"><div className="left" /><div className="right" /></div>
+                            <div className="toggle">{theme === "liquid-glass" && <GlassLens radius={12} />}<div className="left" /><div className="right" /></div>
                         </label>
                     </div>
 
@@ -329,7 +332,7 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
                             }}
                         >
                             {props.isRecordingRich ? (
-                                <div className="key-cap" style={{ width: '8em' }}>{props.t('waiting_for_input')}</div>
+                                <div className="key-cap" style={{ width: '8em' }}>{theme === "liquid-glass" && <GlassLens radius={12} />}{props.t('waiting_for_input')}</div>
                             ) : (
                                 renderHotkeyCaps(props.richPasteHotkey)
                             )}
@@ -374,7 +377,7 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
                             }}
                         >
                             {props.isRecordingSearch ? (
-                                <div className="key-cap" style={{ width: '8em' }}>{props.t('waiting_for_input')}</div>
+                                <div className="key-cap" style={{ width: '8em' }}>{theme === "liquid-glass" && <GlassLens radius={12} />}{props.t('waiting_for_input')}</div>
                             ) : (
                                 renderHotkeyCaps(props.searchHotkey)
                             )}
@@ -386,7 +389,7 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
                             hint={props.t('quick_paste_modifier_hint')}
                             hintKey="quick_paste_modifier"
                         />
-                        <select
+                        <SettingsGlassField theme={theme}><select
                             value={props.quickPasteModifier}
                             onChange={(e) => {
                                 const value = e.target.value as QuickPasteModifier;
@@ -408,7 +411,7 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
                                     {option.label}
                                 </option>
                             ))}
-                        </select>
+                        </select></SettingsGlassField>
                     </div>
                     <div className="setting-item">
                         <props.LabelWithHint
@@ -427,7 +430,7 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
                                     props.saveAppSetting('delete_after_paste', String(val));
                                 }}
                             />
-                            <div className="toggle"><div className="left" /><div className="right" /></div>
+                            <div className="toggle">{theme === "liquid-glass" && <GlassLens radius={12} />}<div className="left" /><div className="right" /></div>
                         </label>
                     </div>
                     <div className="setting-item">
@@ -447,7 +450,7 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
                                     props.saveAppSetting('move_to_top_after_paste', String(val));
                                 }}
                             />
-                            <div className="toggle"><div className="left" /><div className="right" /></div>
+                            <div className="toggle">{theme === "liquid-glass" && <GlassLens radius={12} />}<div className="left" /><div className="right" /></div>
                         </label>
                     </div>
                     {/* macOS cleanup: Removed Paste Method selection */}
@@ -473,7 +476,7 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
                                     }
                                 }}
                             />
-                            <div className="toggle"><div className="left" /><div className="right" /></div>
+                            <div className="toggle">{theme === "liquid-glass" && <GlassLens radius={12} />}<div className="left" /><div className="right" /></div>
                         </label>
                     </div>
 
@@ -517,7 +520,7 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
                                 }}
                             >
                                 {props.isRecordingSequential ? (
-                                    <div className="key-cap" style={{ width: '8em' }}>{props.t('waiting_for_input')}</div>
+                                    <div className="key-cap" style={{ width: '8em' }}>{theme === "liquid-glass" && <GlassLens radius={12} />}{props.t('waiting_for_input')}</div>
                                 ) : (
                                     renderHotkeyCaps(props.sequentialHotkey)
                                 )}
@@ -542,7 +545,7 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
                                     invoke('set_privacy_protection', { enabled: val }).catch(console.error);
                                 }}
                             />
-                            <div className="toggle"><div className="left" /><div className="right" /></div>
+                            <div className="toggle">{theme === "liquid-glass" && <GlassLens radius={12} />}<div className="left" /><div className="right" /></div>
                         </label>
                     </div>
 
@@ -553,7 +556,7 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
                                 className="btn-icon"
                                 onClick={() => props.setPrivacyKindsOpen(!props.privacyKindsOpen)}
                                 style={{ width: '24px', height: '24px' }}
-                            >
+                            >{theme === "liquid-glass" && <GlassLens radius={12} />}
                                 {props.privacyKindsOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                             </button>
                             <props.LabelWithHint
@@ -574,7 +577,8 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
                                 ].map(opt => {
                                     const checked = props.privacyProtectionKinds.includes(opt.id);
                                     return (
-                                        <label key={opt.id} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <label key={opt.id} className={theme === "liquid-glass" ? "settings-glass-checkbox" : undefined} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            {theme === "liquid-glass" && <GlassLens radius={12} />}
                                             <input
                                                 className="cb"
                                                 type="checkbox"
@@ -602,7 +606,7 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
                                 className="btn-icon"
                                 onClick={() => props.setPrivacyRulesOpen(!props.privacyRulesOpen)}
                                 style={{ width: '24px', height: '24px' }}
-                            >
+                            >{theme === "liquid-glass" && <GlassLens radius={12} />}
                                 {props.privacyRulesOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                             </button>
                             <props.LabelWithHint
@@ -612,7 +616,7 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
                             />
                         </div>
                         {props.privacyRulesOpen && (
-                            <textarea
+                            <SettingsGlassField theme={theme}><textarea
                                 className="search-input"
                                 style={{ width: 'calc(100% - 30px)', maxWidth: '100%', minHeight: '80px', padding: '8px', borderRadius: '0', marginLeft: '30px', boxSizing: 'border-box' }}
                                 placeholder={props.t('privacy_protection_custom_rules_placeholder')}
@@ -623,7 +627,7 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
                                     props.setPrivacyProtectionCustomRules(val);
                                     invoke('set_privacy_protection_custom_rules', { rules: val }).catch(console.error);
                                 }}
-                            />
+                            /></SettingsGlassField>
                         )}
                     </div>
 
@@ -634,7 +638,7 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
                                 className="btn-icon"
                                 onClick={() => setMaskSettingsOpen(!maskSettingsOpen)}
                                 style={{ width: '24px', height: '24px' }}
-                            >
+                            >{theme === "liquid-glass" && <GlassLens radius={12} />}
                                 {maskSettingsOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                             </button>
                             <span className="item-label">{props.t('sensitive_mask_settings')}</span>
@@ -643,7 +647,7 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
                             <div style={{ width: 'calc(100% - 30px)', marginLeft: '30px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                 <div className="setting-item" style={{ padding: 0, borderBottom: 'none' }}>
                                     <span className="item-label">{props.t('sensitive_mask_prefix_visible')}</span>
-                                    <input
+                                    <SettingsGlassField theme={theme}><input
                                         type="number"
                                         className="search-input"
                                         style={{ width: '60px', padding: '4px 8px', textAlign: 'center' }}
@@ -655,11 +659,11 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
                                             props.setSensitiveMaskPrefixVisible(val);
                                             invoke('save_setting', { key: 'app.sensitive_mask_prefix_visible', value: val.toString() }).catch(console.error);
                                         }}
-                                    />
+                                    /></SettingsGlassField>
                                 </div>
                                 <div className="setting-item" style={{ padding: 0, borderBottom: 'none' }}>
                                     <span className="item-label">{props.t('sensitive_mask_suffix_visible')}</span>
-                                    <input
+                                    <SettingsGlassField theme={theme}><input
                                         type="number"
                                         className="search-input"
                                         style={{ width: '60px', padding: '4px 8px', textAlign: 'center' }}
@@ -671,7 +675,7 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
                                             props.setSensitiveMaskSuffixVisible(val);
                                             invoke('save_setting', { key: 'app.sensitive_mask_suffix_visible', value: val.toString() }).catch(console.error);
                                         }}
-                                    />
+                                    /></SettingsGlassField>
                                 </div>
                                 <div className="setting-item" style={{ padding: 0, borderBottom: 'none' }}>
                                     <props.LabelWithHint
@@ -681,6 +685,7 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
                                     />
                                     <label className="switch">
                                         <input
+                                            className={theme === "liquid-glass" ? "cb" : undefined}
                                             type="checkbox"
                                             checked={props.sensitiveMaskEmailDomain}
                                             onChange={(e) => {
@@ -688,7 +693,7 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
                                                 invoke('save_setting', { key: 'app.sensitive_mask_email_domain', value: e.target.checked.toString() }).catch(console.error);
                                             }}
                                         />
-                                        <span className="slider" />
+                                        {theme === "liquid-glass" ? <div className="toggle"><GlassLens radius={11} /></div> : <span className="slider" />}
                                     </label>
                                 </div>
                             </div>
@@ -737,7 +742,7 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
                             }}
                         >
                             {props.isRecording ? (
-                                <div className="key-cap" style={{ width: '8em' }}>{props.t('waiting_for_input')}</div>
+                                <div className="key-cap" style={{ width: '8em' }}>{theme === "liquid-glass" && <GlassLens radius={12} />}{props.t('waiting_for_input')}</div>
                             ) : (
                                 renderHotkeyCaps(props.hotkey)
                             )}

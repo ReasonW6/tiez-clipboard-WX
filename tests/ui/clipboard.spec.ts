@@ -62,7 +62,7 @@ test("explicit dark, rapid mode changes and returning to system stay consistent"
 test("Windows 10 light fallback does not inherit the system's dark background", async ({ page }) => {
   await start(page, "?win10=true&mode=light");
   await expect(page.locator("body")).toHaveClass(/windows-10/);
-  expect(await page.locator("#root").evaluate(el => getComputedStyle(el).backgroundColor)).toBe("rgb(243, 245, 248)");
+  expect(await page.locator("#root").evaluate(el => getComputedStyle(el).backgroundColor)).toBe("rgb(244, 246, 249)");
 });
 
 test("hide resets settings, tag dialogs, search and selection; blur alone preserves the page", async ({ page }) => {
@@ -198,7 +198,7 @@ test("glass uses solid surfaces when transparency is reduced, including dark mod
   await start(page, "?theme=liquid-glass&mode=dark");
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-transparency", value: "reduce" }] });
-  expect(await page.locator("#root").evaluate(el => getComputedStyle(el).backgroundColor)).toBe("rgb(35, 39, 49)");
+  expect(await page.locator("#root").evaluate(el => getComputedStyle(el).backgroundColor)).toBe("rgb(23, 31, 43)");
   await openTags(page);
   expect(await page.locator(".tm-search").evaluate(el => getComputedStyle(el, "::before").backdropFilter)).toBe("none");
 });

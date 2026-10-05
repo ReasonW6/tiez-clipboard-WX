@@ -1,7 +1,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { mockIPC, mockWindows, mockConvertFileSrc } from "@tauri-apps/api/mocks";
-import { emit } from "@tauri-apps/api/event";
+import { emit, emitTo } from "@tauri-apps/api/event";
 import "../../src/index.css";
 import "../../src/styles/components/index.css";
 import "../../src/styles/themes/load";
@@ -29,12 +29,38 @@ const samples = [
 ];
 let entries = samples.map(([tag, content], i) => ({ id: i + 1, content_type: "text", content, preview: content,
   source_app: "Test fixture", timestamp: Date.UTC(2026, 8, 14) - i * 60000, is_pinned: false, tags: [tag], use_count: i + 1 }));
+if (params.get("empty") === "true") entries = [];
 let savedTags = ["工作", "代码", "密码", "个人收藏", "一个很长的标签名称用于验证数量不会被截断", "空标签"];
 let theme = "dark";
 let pinned = true;
+const resizeState = { resizable: params.get("resizable") !== "false", maximized: false, fullscreen: false };
 const calls: {command: string; args: any}[] = [];
 const delays: Record<string, number> = {};
 const failures: Record<string, boolean> = {};
+let nativeGlassStatus = { state: "inactive", revision: 0, geometryRevision: 0 };
+let glassGeometryInFlight = 0;
+let maxGlassGeometryInFlight = 0;
+let appliedGlassGeometry: any;
+let appliedGeometryRevision = 0;
+let submittedGlassGeometry: any;
+let submittedGeometryRevision = 0;
+let completedGlassGeometry = 0;
+const setGlassStatus = async (state: string) => {
+  if (state === "ready") {
+    submittedGlassGeometry = structuredClone(appliedGlassGeometry);
+    submittedGeometryRevision = appliedGeometryRevision;
+  }
+  nativeGlassStatus = { state, revision: nativeGlassStatus.revision + 1,
+    geometryRevision: state === "ready" ? submittedGeometryRevision : 0 };
+  await emitTo("main", "native-glass-status", nativeGlassStatus);
+};
+const submitGlassGeometry = async (geometry: any, revision: number) => {
+  if (revision !== appliedGeometryRevision || nativeGlassStatus.state !== "ready") return;
+  submittedGlassGeometry = structuredClone(geometry);
+  submittedGeometryRevision = revision;
+  nativeGlassStatus = { state: "ready", revision: nativeGlassStatus.revision + 1, geometryRevision: revision };
+  await emitTo("main", "native-glass-status", nativeGlassStatus);
+};
 const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 mockWindows("main");
 mockConvertFileSrc("windows");
@@ -44,9 +70,37 @@ mockIPC(async (command, args: any = {}) => {
     case "get_settings": await pause(Number(params.get("settingsDelay") || "0")); return { ...settings };
     case "save_setting": settings[args.key] = args.value; localStorage.setItem("fixture-settings", JSON.stringify(settings)); return null;
     case "get_platform_info": return { platform: "windows", is_windows_10: params.get("win10") === "true", is_windows_11: params.get("win10") !== "true" };
-    case "set_theme": await pause(args.colorMode === "dark" ? 80 : 5); theme = args.colorMode === "system" ? "dark" : args.colorMode; return null;
+    case "set_theme":
+      await pause(args.colorMode === "dark" ? 80 : 5);
+      theme = args.colorMode === "system" ? "dark" : args.colorMode;
+      if (params.get("nativeGlass") === "true") await setGlassStatus(args.theme === "liquid-glass" ? "pending" : "inactive");
+      return null;
+    case "set_glass_geometry":
+      glassGeometryInFlight++;
+      maxGlassGeometryInFlight = Math.max(maxGlassGeometryInFlight, glassGeometryInFlight);
+      try {
+        await pause(delays.nativeGlassGeometry || 0);
+        if (failures.nativeGlassGeometry) throw new Error("fixture geometry error");
+        appliedGlassGeometry = structuredClone(args.geometry);
+        completedGlassGeometry++;
+        const revision = ++appliedGeometryRevision;
+        if (delays.nativeGlassPresentation) {
+          void pause(delays.nativeGlassPresentation).then(() => submitGlassGeometry(args.geometry, revision));
+        } else await submitGlassGeometry(args.geometry, revision);
+        if (delays.nativeGlassGeometryReply) await pause(delays.nativeGlassGeometryReply);
+        return revision;
+      }
+      finally { glassGeometryInFlight--; }
+    case "get_native_glass_status": {
+      const snapshot = { ...nativeGlassStatus };
+      await pause(delays.nativeGlassStatus ?? Number(params.get("nativeGlassQueryDelay") || "0"));
+      return snapshot;
+    }
     case "plugin:window|theme": return theme;
     case "plugin:window|is_visible": return true;
+    case "plugin:window|is_resizable": return resizeState.resizable;
+    case "plugin:window|is_maximized": return resizeState.maximized;
+    case "plugin:window|is_fullscreen": return resizeState.fullscreen;
     case "plugin:window|scale_factor": return 1;
     case "plugin:window|inner_size": case "plugin:window|outer_size": return { width: innerWidth, height: innerHeight };
     case "plugin:window|get_all_windows": case "plugin:webview|get_all_webviews": return [];
@@ -89,7 +143,34 @@ mockIPC(async (command, args: any = {}) => {
     default: return null;
   }
 }, { shouldMockEvents: true });
-Object.assign(window, { testApp: { settings, calls, delays, failures, emit,
+// Tauri's bundled mock ignores listener targets and does not implement emitTo.
+// Model target routing for this window-specific protocol only.
+const internals = (window as any).__TAURI_INTERNALS__;
+const originalInvoke = internals.invoke;
+const glassListeners = new Map<number, { kind: string; label?: string }>();
+internals.invoke = async (command: string, args: any = {}, options: any) => {
+  if (args.event !== "native-glass-status") return originalInvoke(command, args, options);
+  if (command === "plugin:event|listen") { glassListeners.set(args.handler, args.target); return args.handler; }
+  if (command === "plugin:event|unlisten") { glassListeners.delete(args.eventId); return null; }
+  if (command === "plugin:event|emit" || command === "plugin:event|emit_to") {
+    for (const [handler, target] of glassListeners) {
+      if (command === "plugin:event|emit" || target.kind === "Any" || (target.label === args.target.label
+        && (target.kind === "AnyLabel" || args.target.kind === "AnyLabel" || target.kind === args.target.kind))) {
+        internals.runCallback(handler, { event: args.event, payload: args.payload, id: handler });
+      }
+    }
+    return null;
+  }
+  return originalInvoke(command, args, options);
+};
+Object.assign(window, { testApp: { settings, calls, delays, failures, emit, emitTo,
+  setResizeState: async (next: Partial<typeof resizeState>) => { Object.assign(resizeState, next); await emit("tauri://resize", { width: innerWidth, height: innerHeight }); },
+  setGlassStatus, getGlassStatus: () => ({ ...nativeGlassStatus }),
+  getGlassGeometryConcurrency: () => maxGlassGeometryInFlight,
+  getGlassGeometryInFlight: () => glassGeometryInFlight,
+  getAppliedGlassGeometry: () => structuredClone(appliedGlassGeometry),
+  getSubmittedGlassGeometry: () => structuredClone(submittedGlassGeometry),
+  getCompletedGlassGeometryCount: () => completedGlassGeometry,
   setContent: (id: number, content: string) => { const entry = entries.find(entry => entry.id === id)!; entry.content = content; },
   getEntries: () => structuredClone(entries), getTheme: () => theme } });
 localStorage.setItem("tiez_theme", settings["app.theme"]);

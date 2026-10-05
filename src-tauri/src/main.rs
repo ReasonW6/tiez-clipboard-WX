@@ -113,6 +113,9 @@ fn main() {
             app::commands::quit,
             app::commands::relaunch,
             app::commands::set_theme,
+            app::commands::set_material_opacity,
+            app::commands::set_glass_geometry,
+            app::commands::get_native_glass_status,
             app::commands::get_platform_info,
             app::commands::send_system_notification,
             app::commands::register_hotkey,
@@ -149,7 +152,10 @@ fn main() {
     match app {
         Ok(app) => {
             info!(">>> [STARTUP] Tauri app built successfully.");
-            app.run(|_app_handle, _event| {});
+            app.run(|app_handle, event| {
+                #[cfg(target_os = "windows")]
+                infrastructure::window_material::handle_run_event(app_handle, &event);
+            });
         }
         Err(e) => {
             error!(">>> [STARTUP] Failed to build tauri app: {}", e);

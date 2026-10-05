@@ -1,0 +1,67 @@
+/* Each category owns one optical surface, including when it is not selected.
+   Selection is a tint above that surface, never a second overlapping lens. */
+body.theme-liquid-glass .type-filter-scroll {
+  padding: 8px 8px 10px;
+  margin: 2px -8px -10px;
+}
+body.theme-liquid-glass .type-filter-track .type-filter-btn {
+  isolation: isolate;
+  min-height: 30px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+  border-color: transparent;
+  box-shadow: none;
+  background: transparent;
+  color: var(--text-primary);
+  --glass-shadow: var(--glass-control-shadow);
+  --filter-fill: transparent;
+}
+body.theme-liquid-glass .type-filter-label { position: relative; z-index: 1; }
+body.theme-liquid-glass .type-filter-track .type-filter-btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: var(--filter-fill);
+  transition: background-color .16s ease;
+}
+body.theme-liquid-glass .type-filter-track .type-filter-btn:hover {
+  --filter-fill: rgba(var(--accent-color-rgb), .1);
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+body.theme-liquid-glass .type-filter-track .type-filter-btn.active {
+  --filter-fill: rgba(var(--accent-color-rgb), .24);
+  background: transparent;
+  color: var(--text-primary);
+  border-color: transparent;
+  box-shadow: none;
+}
+body.theme-liquid-glass .type-filter-track .type-filter-btn.active:hover {
+  --filter-fill: rgba(var(--accent-color-rgb), .3);
+}
+@media (prefers-reduced-motion: reduce) {
+  body.theme-liquid-glass .type-filter-track .type-filter-btn::after { transition: none; }
+}
+body.theme-liquid-glass .type-filter-track .type-filter-btn:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+@media (forced-colors: active) {
+  body.theme-liquid-glass .type-filter-track .type-filter-btn.active .type-filter-label {
+    text-decoration: underline;
+  }
+  body.theme-liquid-glass .type-filter-track .type-filter-btn.active {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+  body.theme-liquid-glass .type-filter-track .type-filter-btn:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+}

@@ -58,9 +58,36 @@ export const getTagColor = (tag: string, theme: string) => {
   }
 };
 
-export const getTagTextColor = (backgroundColor: string) => {
-  void backgroundColor;
-  return "#ffffff";
+export const getTagTextColor = (backgroundColor: string, theme?: string) => {
+  if (theme !== "mica" && theme !== "acrylic" && theme !== "liquid-glass") return "#ffffff";
+
+  // Tags use opaque HEX from the color picker or the HSL generated above.
+  // Other CSS colors can depend on the backdrop; retain their existing ink.
+  const color = backgroundColor.trim();
+  const hex = color.match(/^#([\da-f]{3}|[\da-f]{6})$/i);
+  const hsl = color.match(/^hsl\(\s*([\d.]+)\s*,\s*([\d.]+)%\s*,\s*([\d.]+)%\s*\)$/i);
+  let channels: number[];
+  if (hex) {
+    const digits = hex[1].length === 3 ? [...hex[1]].map(digit => digit + digit).join("") : hex[1];
+    channels = [0, 2, 4].map(offset => parseInt(digits.slice(offset, offset + 2), 16) / 255);
+  } else if (hsl) {
+    const [hue, saturation, lightness] = hsl.slice(1).map(Number);
+    if (![hue, saturation, lightness].every(Number.isFinite) || saturation > 100 || lightness > 100) return "#ffffff";
+    const light = lightness / 100;
+    const amplitude = saturation / 100 * Math.min(light, 1 - light);
+    channels = [0, 8, 4].map(offset => {
+      const phase = (offset + hue / 30) % 12;
+      return light - amplitude * Math.max(-1, Math.min(phase - 3, 9 - phase, 1));
+    });
+  } else {
+    return "#ffffff";
+  }
+
+  const luminance = channels
+    .map(channel => channel <= .04045 ? channel / 12.92 : ((channel + .055) / 1.055) ** 2.4)
+    .reduce((sum, channel, i) => sum + channel * [.2126, .7152, .0722][i], 0);
+  // The greater black/white contrast is at least 4.58:1 on an opaque sRGB fill.
+  return (luminance + .05) / .05 >= 1.05 / (luminance + .05) ? "#000000" : "#ffffff";
 };
 
 export const getConciseTime = (timestamp: number, language: Locale) => {

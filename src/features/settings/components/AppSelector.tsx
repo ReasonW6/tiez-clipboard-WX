@@ -1,8 +1,18 @@
 import { useState, useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import Select from "react-select";
-import type { SingleValue } from "react-select";
+import Select, { components } from "react-select";
+import type { ControlProps, MenuProps, SingleValue } from "react-select";
+import GlassLens from "../../../shared/components/GlassLens";
 import type { InstalledAppOption } from "../../app/types";
+
+const GlassAppControl = (props: ControlProps<InstalledAppOption, false>) => (
+    <components.Control {...props}><GlassLens radius={12} />{props.children}</components.Control>
+);
+const GlassAppMenu = (props: MenuProps<InstalledAppOption, false>) => (
+    <components.Menu {...props} innerProps={{ ...props.innerProps, ...{ "data-glass-css-only": "true" } }}>
+        <GlassLens radius={12} />{props.children}
+    </components.Menu>
+);
 
 const AppSelector = ({ type, installedApps, onSelect, theme, t, colorMode }: { type: string | null, installedApps: InstalledAppOption[], onSelect: (val: string) => void, theme: string, t: (key: string) => string, colorMode: string }) => {
     const [recommended, setRecommended] = useState<InstalledAppOption[]>([]);
@@ -116,6 +126,8 @@ const AppSelector = ({ type, installedApps, onSelect, theme, t, colorMode }: { t
 
     return (
         <Select
+            classNamePrefix="settings-app-select"
+            components={theme === "liquid-glass" ? { Control: GlassAppControl, Menu: GlassAppMenu } : undefined}
             options={options}
             isLoading={loading}
             onFocus={() => invoke("focus_clipboard_window").catch(console.error)}
@@ -167,7 +179,7 @@ const AppSelector = ({ type, installedApps, onSelect, theme, t, colorMode }: { t
                     background: state.isFocused
                         ? (isModern ? 'var(--accent-color)' : '#373737')
                         : 'transparent',
-                    color: state.isFocused ? '#fff' : (isDarkMode ? '#eaeaea' : 'var(--text-primary)'),
+                    color: state.isFocused ? (theme === "liquid-glass" ? 'var(--button-active-filled-color)' : '#fff') : (isDarkMode ? '#eaeaea' : 'var(--text-primary)'),
                     cursor: 'pointer',
                     fontFamily: 'inherit',
                     fontSize: '12px'
@@ -181,7 +193,7 @@ const AppSelector = ({ type, installedApps, onSelect, theme, t, colorMode }: { t
                     borderBottom: isDarkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(128,128,128,0.1)',
                     marginBottom: '4px'
                 }),
-                placeholder: (base) => ({ ...base, fontSize: '12px', color: isDarkMode ? '#cfcfcf' : base.color }),
+                placeholder: (base) => ({ ...base, fontSize: '12px', color: theme === "liquid-glass" ? 'var(--text-secondary)' : isDarkMode ? '#cfcfcf' : base.color }),
                 input: (base) => ({ ...base, color: isDarkMode ? '#eaeaea' : 'var(--text-primary)' }),
                 singleValue: (base) => ({ ...base, color: isDarkMode ? '#eaeaea' : 'var(--text-primary)' })
             }}

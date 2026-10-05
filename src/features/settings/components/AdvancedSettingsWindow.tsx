@@ -185,6 +185,7 @@ const AdvancedSettingsWindow = () => {
     return (
         <div className="advanced-settings-window-shell">
             <AdvancedSettingsGroup
+                theme={theme}
                 t={t}
                 cleanupRules={cleanupRules}
                 setCleanupRules={setCleanupRules}

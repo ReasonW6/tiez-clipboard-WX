@@ -1,3 +1,5 @@
+import SettingsGlassField from "../SettingsGlassField";
+import GlassLens from "../../../../shared/components/GlassLens";
 import type { ComponentType, ReactNode, CSSProperties } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open, message } from "@tauri-apps/plugin-dialog";
@@ -89,10 +91,13 @@ const AppearanceSettingsGroup = ({
 }: AppearanceSettingsGroupProps) => {
     const showCustomBackgroundControls = supportsCustomBackground(theme);
     const showSurfaceOpacityControls = supportsSurfaceOpacity(theme);
+    // Stored values remain opacity so existing installations keep their look.
+    const transparency = 100 - surfaceOpacity;
+    const backgroundTransparency = 100 - customBackgroundOpacity;
 
     return (
     <div className={`settings-group ${collapsed ? 'collapsed' : ''}`}>
-        <div className="group-header" onClick={onToggle}>
+        <div className="group-header" onClick={onToggle}>{theme === "liquid-glass" && <GlassLens radius={12} />}
             <h3 style={{ margin: 0 }}>{t('appearance_settings')}</h3>
             {collapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
         </div>
@@ -113,7 +118,7 @@ const AppearanceSettingsGroup = ({
                                 className={`btn-icon theme-choice-btn ${theme === themeItem.id ? 'active' : ''}`}
                                 aria-pressed={theme === themeItem.id}
                                 type="button"
-                            >
+                            >{theme === "liquid-glass" && <GlassLens radius={12} />}
                                 <span className={`theme-swatch theme-swatch-${themeItem.id}`} aria-hidden="true"><i /><i /><i /></span>
                                 <span className="theme-choice-title">
                                     {getThemeLabel(themeItem.id, language)}
@@ -140,7 +145,7 @@ const AppearanceSettingsGroup = ({
                                     saveAppSetting('color_mode', modeItem.id);
                                 }}
                                 className={`btn-icon settings-inline-choice-btn ${colorMode === modeItem.id ? 'active' : ''}`}
-                            >
+                            >{theme === "liquid-glass" && <GlassLens radius={12} />}
                                 {modeItem.name}
                             </button>
                         ))}
@@ -164,7 +169,7 @@ const AppearanceSettingsGroup = ({
                                     saveAppSetting('language', lang.id);
                                 }}
                                 className={`btn-icon settings-inline-choice-btn ${language === lang.id ? 'active' : ''}`}
-                            >
+                            >{theme === "liquid-glass" && <GlassLens radius={12} />}
                                 {lang.name}
                             </button>
                         ))}
@@ -188,7 +193,7 @@ const AppearanceSettingsGroup = ({
                                 saveAppSetting('show_source_app_icon', String(val));
                             }}
                         />
-                        <div className="toggle"><div className="left" /><div className="right" /></div>
+                        <div className="toggle">{theme === "liquid-glass" && <GlassLens radius={12} />}<div className="left" /><div className="right" /></div>
                     </label>
                 </div>
 
@@ -209,7 +214,7 @@ const AppearanceSettingsGroup = ({
                                 saveAppSetting('compact_mode', String(val));
                             }}
                         />
-                        <div className="toggle"><div className="left" /><div className="right" /></div>
+                        <div className="toggle">{theme === "liquid-glass" && <GlassLens radius={12} />}<div className="left" /><div className="right" /></div>
                     </label>
                 </div>
 
@@ -224,7 +229,7 @@ const AppearanceSettingsGroup = ({
                             {clipboardItemFontSize}px
                         </span>
                     </div>
-                    <input
+                    <SettingsGlassField theme={theme}><input
                         type="range"
                         min="11"
                         max="18"
@@ -236,7 +241,7 @@ const AppearanceSettingsGroup = ({
                             saveAppSetting('clipboard_item_font_size', String(val));
                         }}
                         style={buildRangeStyle(clipboardItemFontSize, 11, 18)}
-                    />
+                    /></SettingsGlassField>
                 </div>
 
                 <div className="setting-item column">
@@ -250,7 +255,7 @@ const AppearanceSettingsGroup = ({
                             {clipboardTagFontSize}px
                         </span>
                     </div>
-                    <input
+                    <SettingsGlassField theme={theme}><input
                         type="range"
                         min="8"
                         max="14"
@@ -262,7 +267,7 @@ const AppearanceSettingsGroup = ({
                             saveAppSetting('clipboard_tag_font_size', String(val));
                         }}
                         style={buildRangeStyle(clipboardTagFontSize, 8, 14)}
-                    />
+                    /></SettingsGlassField>
                 </div>
 
                 {(showCustomBackgroundControls || showSurfaceOpacityControls) && (
@@ -302,7 +307,7 @@ const AppearanceSettingsGroup = ({
                                     }}
                                     className="btn-icon"
                                     style={{ flex: 1, height: '36px', fontSize: '12px', fontWeight: 'bold' }}
-                                >
+                                >{theme === "liquid-glass" && <GlassLens radius={12} />}
                                     {customBackground ? (t('change_background') || '更换背景') : (t('choose_background') || '选择背景')}
                                 </button>
                                 {customBackground && (
@@ -314,7 +319,7 @@ const AppearanceSettingsGroup = ({
                                         className="btn-icon"
                                         style={{ height: '36px', fontSize: '12px', fontWeight: 'bold', padding: '0 12px' }}
                                         title={t('clear_background') || '清除背景'}
-                                    >
+                                    >{theme === "liquid-glass" && <GlassLens radius={12} />}
                                         <X size={16} />
                                     </button>
                                 )}
@@ -329,20 +334,21 @@ const AppearanceSettingsGroup = ({
                                 <div className="setting-item column no-border" style={{ marginTop: '12px' }}>
                                     <div className="item-label-group" style={{ marginBottom: '4px', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <span className="item-label">{t('background_opacity')}</span>
-                                        <span className="hint" style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{customBackgroundOpacity}%</span>
+                                        <span className="hint range-value">{backgroundTransparency}%</span>
                                     </div>
-                                    <input
+                                    <SettingsGlassField theme={theme}><input
                                         type="range"
                                         min="0"
                                         max="100"
-                                        value={customBackgroundOpacity}
+                                        aria-label={t('background_opacity')}
+                                        value={backgroundTransparency}
                                         onChange={(e) => {
-                                            const val = parseInt(e.target.value);
+                                            const val = 100 - Number(e.target.value);
                                             setCustomBackgroundOpacity(val);
                                             saveAppSetting('custom_background_opacity', String(val));
                                         }}
-                                        style={buildRangeStyle(customBackgroundOpacity, 0, 100)}
-                                    />
+                                        style={buildRangeStyle(backgroundTransparency, 0, 100)}
+                                    /></SettingsGlassField>
                                 </div>
                             )}
                         </div>
@@ -352,26 +358,29 @@ const AppearanceSettingsGroup = ({
                         <div className="setting-item column">
                             <div className="item-label-group" style={{ marginBottom: '4px', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <span className="item-label">{t(theme === 'liquid-glass' ? 'glass_transparency' : 'surface_opacity')}</span>
-                                <span className="hint" style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{theme === 'liquid-glass' ? 100 - surfaceOpacity : surfaceOpacity}%</span>
+                                <span className="hint range-value">{transparency}%</span>
                             </div>
+                            <div className={theme === 'liquid-glass' ? 'glass-slider-control' : undefined}>
                             <input
                                 type="range"
                                 min="0"
                                 max="100"
                                 aria-label={t(theme === 'liquid-glass' ? 'glass_transparency' : 'surface_opacity')}
-                                className={theme === 'liquid-glass' ? 'glass-transparency-slider' : undefined}
-                                value={theme === 'liquid-glass' ? 100 - surfaceOpacity : surfaceOpacity}
+                                className={theme === 'liquid-glass' ? 'glass-material-slider glass-transparency-slider' : undefined}
+                                value={transparency}
                                 onChange={(e) => {
-                                    const val = theme === 'liquid-glass' ? 100 - Number(e.target.value) : Number(e.target.value);
+                                    const val = 100 - Number(e.target.value);
                                     setSurfaceOpacity(val);
                                     saveAppSetting('surface_opacity', String(val));
                                 }}
-                                style={buildRangeStyle(theme === 'liquid-glass' ? 100 - surfaceOpacity : surfaceOpacity, 0, 100)}
+                                style={buildRangeStyle(transparency, 0, 100)}
                             />
-                            {theme === 'liquid-glass' && <>
+                            {theme === 'liquid-glass' && <span className="glass-slider-thumb" aria-hidden="true" style={{ left: `calc(${transparency}% - ${transparency * .3}px)` }}><GlassLens radius={11} /></span>}
+                            </div>
+                            <>
                                 <div className="glass-range-labels"><span>{t('glass_soft')}</span><span>{t('glass_clear')}</span></div>
                                 <p className="glass-setting-hint">{t('glass_transparency_hint')}</p>
-                            </>}
+                            </>
                         </div>
                         )}
 

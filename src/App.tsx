@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import ToastContainer from "./shared/components/ToastContainer";
 import ConfirmDialog from "./shared/components/ConfirmDialog";
+import NativeGlassResizeHandles from "./shared/components/NativeGlassResizeHandles";
 
 import { translations } from "./locales";
 import AppHeader from "./features/app/components/AppHeader";
@@ -952,6 +953,7 @@ const App = () => {
         onUpdate={updateStatus === "ready" ? onApplyUpdate : onStartDownload}
         onClose={closeUpdateDialog}
       />
+      {theme === "liquid-glass" && <NativeGlassResizeHandles />}
     </div>
     </MotionConfig>
   );

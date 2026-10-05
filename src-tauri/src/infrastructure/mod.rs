@@ -3,6 +3,8 @@ pub mod asset_scope;
 pub mod repository;
 #[cfg(target_os = "windows")]
 pub mod windows_ext;
+#[cfg(target_os = "windows")]
+pub mod window_material;
 
 #[cfg(target_os = "windows")]
 pub mod windows_api;

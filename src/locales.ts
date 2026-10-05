@@ -23,9 +23,9 @@ export const translations = {
         tm_uses: "次",
         tm_selected: "已选 {count} 项",
         glass_transparency: "液态玻璃透明度",
-        glass_transparency_hint: "向右更清透，向左更柔和；文字区域始终保留清晰底色。",
+        glass_transparency_hint: "向右更清透，向左更柔和；最高档仍保留清晰可读的底色。",
         glass_clear: "清透",
-        glass_soft: "磨砂",
+        glass_soft: "柔和",
         // App Selector
         system_recommended: "✨ 系统推荐",
         all_apps: "📂 所有应用",
@@ -35,6 +35,7 @@ export const translations = {
 
         // Header
         settings: "设置",
+        back: "返回",
         app_name: "TieZ",
         clear_history: "清空历史",
         hide: "隐藏",
@@ -196,7 +197,7 @@ export const translations = {
         clear_background: "清除背景",
         background_size_error: "图片文件过大！请选择小于 10MB 的图片。",
         background_opacity: "背景图片透明度",
-        surface_opacity: "界面不透明度",
+        surface_opacity: "界面透明度",
         error: "错误",
         notice: "提示",
 
@@ -391,9 +392,9 @@ export const translations = {
         tm_uses: "uses",
         tm_selected: "{count} selected",
         glass_transparency: "Liquid Glass transparency",
-        glass_transparency_hint: "Slide right for a clearer finish or left for a softer one. Text keeps a readable surface.",
+        glass_transparency_hint: "Slide right for a clearer surface or left for a softer look. The clearest setting retains enough tint for readability.",
         glass_clear: "Clear",
-        glass_soft: "Frosted",
+        glass_soft: "Soft",
         // App Selector
         system_recommended: "✨ Recommended",
         all_apps: "📂 All Apps",
@@ -403,6 +404,7 @@ export const translations = {
 
         // Header
         settings: "Settings",
+        back: "Back",
         app_name: "TieZ",
         clear_history: "Clear History",
         hide: "Hide",
@@ -573,8 +575,8 @@ export const translations = {
         change_background: "Change Background",
         clear_background: "Clear Background",
         background_size_error: "Image file is too large! Please choose an image smaller than 10MB.",
-        background_opacity: "Background Opacity",
-        surface_opacity: "Surface Opacity",
+        background_opacity: "Background Transparency",
+        surface_opacity: "Surface Transparency",
         error: "Error",
         notice: "Notice",
 
@@ -762,9 +764,9 @@ export const translations = {
         tm_uses: "次",
         tm_selected: "已選 {count} 項",
         glass_transparency: "液態玻璃透明度",
-        glass_transparency_hint: "向右更清透，向左更柔和；文字區域始終保留清晰底色。",
+        glass_transparency_hint: "向右更清透，向左更柔和；最高檔仍保留清晰可讀的底色。",
         glass_clear: "清透",
-        glass_soft: "磨砂",
+        glass_soft: "柔和",
         // App Selector
         system_recommended: "✨ 系統推薦",
         all_apps: "📂 所有應用",
@@ -774,6 +776,7 @@ export const translations = {
 
         // Header
         settings: "設定",
+        back: "返回",
         app_name: "TieZ",
         clear_history: "清空歷史",
         hide: "隱藏",
@@ -935,7 +938,7 @@ export const translations = {
         clear_background: "清除背景",
         background_size_error: "圖片檔案過大！請選擇小於 10MB 的圖片。",
         background_opacity: "背景圖片透明度",
-        surface_opacity: "介面不透明度",
+        surface_opacity: "介面透明度",
         error: "錯誤",
         notice: "提示",
 

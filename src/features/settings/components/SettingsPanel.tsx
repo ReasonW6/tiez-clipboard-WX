@@ -1,8 +1,8 @@
+import GlassLens from "../../../shared/components/GlassLens";
 
 import { memo, useState, useEffect, useCallback } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { ChevronRight, HelpCircle } from "lucide-react";
-import { motion } from "framer-motion";
 import type { Locale } from "../../../shared/types";
 import type { DefaultAppsMap, InstalledAppOption, SettingsSubpage} from "../../app/types";
 import type { AppCleanupPolicy} from "../types";
@@ -210,7 +210,7 @@ const SettingsPanel = (props: SettingsPanelProps) => {
                             e.stopPropagation();
                             toggleHint(hintKey);
                         }}
-                    >
+                    >{theme === "liquid-glass" && <GlassLens radius={12} />}
                         <HelpCircle size={12} />
                     </button>
                 )}
@@ -236,14 +236,13 @@ const SettingsPanel = (props: SettingsPanelProps) => {
     }, [setSettingsSubpage]);
 
     return (
-        <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
+        <div
             style={{ display: 'flex', flexDirection: 'column', gap: '4px', minHeight: '100%', flex: 1 }}
         >
             {settingsSubpage === "advanced" ? (
                 <>
                     <AdvancedSettingsGroup
+                theme={theme}
                         t={t}
                         cleanupRules={cleanupRules}
                         setCleanupRules={setCleanupRules}
@@ -268,6 +267,7 @@ const SettingsPanel = (props: SettingsPanelProps) => {
                 <>
             {/* General Settings */}
             <GeneralSettingsGroup
+                theme={theme}
                 t={t}
                 collapsed={collapsedGroups['general']}
                 onToggle={() => toggleGroup('general')}
@@ -404,6 +404,7 @@ const SettingsPanel = (props: SettingsPanelProps) => {
 
             {/* Default Apps Settings */}
             <DefaultAppsSettingsGroup
+                theme={theme}
                 t={t}
                 collapsed={collapsedGroups['default_apps']}
                 onToggle={() => toggleGroup('default_apps')}
@@ -415,6 +416,7 @@ const SettingsPanel = (props: SettingsPanelProps) => {
 
             {/* Data Management Settings */}
             <DataSettingsGroup
+                theme={theme}
                 t={t}
                 collapsed={collapsedGroups['data']}
                 onToggle={() => toggleGroup('data')}
@@ -426,7 +428,7 @@ const SettingsPanel = (props: SettingsPanelProps) => {
                     type="button"
                     className="group-header settings-nav-card"
                     onClick={openAdvancedSettingsWindow}
-                >
+                >{theme === "liquid-glass" && <GlassLens radius={12} />}
                     <div style={{ minWidth: 0, textAlign: "left" }}>
                         <h3 style={{ margin: 0 }}>{t("advanced_settings")}</h3>
                         <div className="settings-subpage-note">{t("advanced_settings_entry_desc")}</div>
@@ -436,6 +438,7 @@ const SettingsPanel = (props: SettingsPanelProps) => {
             </div>
 
             <SettingsFooter
+                theme={theme}
                 t={t}
                 appVersion={appVersion}
                 updateStatus={updateStatus}
@@ -459,7 +462,7 @@ const SettingsPanel = (props: SettingsPanelProps) => {
             {/* Removed UpdateModal in generic */}
                 </>
             )}
-        </motion.div>
+        </div>
     );
 };
 

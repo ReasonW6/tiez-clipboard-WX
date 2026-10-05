@@ -6,8 +6,9 @@ import { ArrowUp, Clipboard } from "lucide-react";
 import { VirtualClipboardList } from "../../clipboard/components/VirtualClipboardList";
 import type { ClipboardEntry } from "../../../shared/types";
 import type { VirtualClipboardListHandle } from "../../clipboard/types";
+import GlassLens from "../../../shared/components/GlassLens";
+import SettingsPanel from "../../settings/components/SettingsPanel";
 
-const SettingsPanel = lazy(() => import("../../settings/components/SettingsPanel"));
 const TagManager = lazy(() => import("../../tag/components/TagManager"));
 const EmojiPanel = lazy(() => import("../../emoji/components/EmojiPanel"));
 
@@ -221,11 +222,8 @@ const AppMainContent = ({
 
   if (showSettings) {
 
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: .18, ease: [.22, 1, .36, 1] }}
+    const settings = (
+      <div
         className={`settings-view ${settingsPanelProps.settingsSubpage === "advanced" ? "advanced-view-shell" : ""}`}
         style={{
           display: "flex",
@@ -237,8 +235,15 @@ const AppMainContent = ({
           maxWidth: settingsPanelProps.settingsSubpage === "advanced" ? "none" : undefined
         }}
       >
-        <Suspense fallback={<div className="panel-loading" role="status">{t("loading")}</div>}><SettingsPanel {...settingsPanelProps} /></Suspense>
-      </motion.div>
+        <SettingsPanel {...settingsPanelProps} />
+      </div>
+    );
+    if (theme !== "liquid-glass") return settings;
+    return (
+      <div className={`settings-glass-viewport${settingsPanelProps.settingsSubpage === "advanced" ? " advanced-view-shell" : ""}`}>
+        <div className="settings-reading-plane" aria-hidden="true"><GlassLens radius={24} material="reading" /></div>
+        {settings}
+      </div>
     );
   }
 

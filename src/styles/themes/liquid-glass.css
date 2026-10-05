@@ -1,11 +1,8 @@
-/* Apple regular-material hierarchy and Aave's moving selection/slider pattern.
+/* Readable glass baseline with an isolated optical rim.
    The foreground never passes through an optical filter. */
 :root.theme-liquid-glass, body.theme-liquid-glass {
-  --bg-window: rgba(240,245,252,var(--surface-fill));
-  --bg-panel: rgba(253,254,255,var(--material-content-opacity));
-  --bg-input: rgba(255,255,255,var(--material-control-opacity));
-  --bg-element: rgba(253,254,255,var(--material-content-opacity));
-  --bg-button: rgba(255,255,255,var(--material-control-opacity));
+  --material-rgb: 245, 248, 252;
+  --material-grain: 0;
   --shell-backdrop-filter: none;
   --shell-radius: 16px;
   --button-radius: 999px;
@@ -13,24 +10,32 @@
   --panel-radius: 16px;
   --card-radius: 16px;
   --shell-shadow: none;
-  --glass-control-shadow: 0 3px 12px rgba(31,49,74,.07), inset 0 1px 0 rgba(255,255,255,.28);
+  --glass-control-shadow: 0 4px 12px rgba(31,49,74,.16);
+  --glass-panel-shadow: 0 6px 16px rgba(31,49,74,.14);
+  --glass-card-shadow: 0 3px 10px rgba(31,49,74,.14);
+  --glass-reading-shadow: 0 2px 8px rgba(31,49,74,.14);
+  --glass-navigation-shadow: 0 2px 8px rgba(31,49,74,.16);
+  --glass-rim: rgba(255,255,255,.28);
   --card-shadow: 0 2px 7px rgba(31,49,74,.04);
   --card-hover-shadow: 0 4px 12px rgba(31,49,74,.075);
   --card-hover-transform: none;
-  --card-border: 1px solid rgba(38,57,82,.1);
-  --panel-border: 1px solid rgba(38,57,82,.1);
+  --card-border: 1px solid var(--line-soft);
+  --panel-border: 1px solid var(--line-soft);
 }
 :root.theme-liquid-glass.dark-mode, body.theme-liquid-glass.dark-mode {
-  --bg-window: rgba(23,32,47,var(--surface-fill));
-  --bg-panel: rgba(34,45,62,var(--material-content-opacity));
-  --bg-input: rgba(43,57,76,var(--material-control-opacity));
-  --bg-element: rgba(34,45,62,var(--material-content-opacity));
-  --bg-button: rgba(43,57,76,var(--material-control-opacity));
-  --glass-control-shadow: 0 3px 12px rgba(0,9,23,.16), inset 0 1px 0 rgba(220,233,255,.075);
+  --text-muted: #e1e7f0;
+  --material-link-color: #e0eaff;
+  --material-rgb: 23, 31, 43;
+  --glass-control-shadow: 0 4px 12px rgba(0,5,15,.34);
+  --glass-panel-shadow: 0 6px 16px rgba(0,5,15,.30);
+  --glass-card-shadow: 0 3px 10px rgba(0,5,15,.30);
+  --glass-reading-shadow: 0 2px 8px rgba(0,5,15,.30);
+  --glass-navigation-shadow: 0 2px 8px rgba(0,5,15,.34);
+  --glass-rim: rgba(230,238,255,.16);
   --card-shadow: 0 2px 7px rgba(0,9,23,.09);
   --card-hover-shadow: 0 4px 12px rgba(0,9,23,.14);
-  --card-border: 1px solid rgba(218,231,252,.12);
-  --panel-border: 1px solid rgba(218,231,252,.12);
+  --card-border: 1px solid var(--line-soft);
+  --panel-border: 1px solid var(--line-soft);
 }
 body.theme-liquid-glass :is(.header-actions, .liquid-search, .tm-search, .tm-view-toggle, .tm-batch-bar, .queue-bar) {
   position: relative;
@@ -40,27 +45,134 @@ body.theme-liquid-glass :is(.header-actions, .liquid-search, .tm-search, .tm-vie
   border-radius: 20px;
 }
 body.theme-liquid-glass .header-actions { border-radius: 999px; padding: 3px; gap: 2px; }
+/* Decoration is painted after refraction, so the lens cannot sample its own rim. */
+body.theme-liquid-glass :is(.header-actions, .header-back, .liquid-search) {
+  position: relative;
+  isolation: isolate;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+body.theme-liquid-glass .header-back:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 2px; }
+/* Clipboard content uses the same single optical shape as the search field.
+   Foreground ink stays above it; only the fallback paints a CSS glass rim. */
+body.theme-liquid-glass .history-item {
+  isolation: isolate;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  --glass-shadow: var(--glass-card-shadow);
+  --card-selected-outline: none;
+  --card-selected-border-color: transparent;
+  --card-selected-shadow: none;
+}
+body.theme-liquid-glass .history-item:hover {
+  background: rgba(var(--accent-color-rgb),.06);
+  border-color: transparent;
+  box-shadow: none;
+}
+body.theme-liquid-glass .history-item.selected {
+  background: rgba(var(--accent-color-rgb),.16);
+}
+body.theme-liquid-glass .history-item .item-meta { border-bottom-color: transparent; }
+body.theme-liquid-glass.dark-mode .history-item.selected :is(.app-info, .item-meta-right-info, .quick-paste-hint) {
+  color: var(--text-primary);
+}
+body.theme-liquid-glass .history-item :is(button, input):focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+.glass-lens { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: -1; }
+.glass-lens-defs { position: absolute; width: 0; height: 0; }
+.glass-lens-refraction { position: absolute; inset: 0; border-radius: inherit; }
+.glass-lens-reflection {
+  position: absolute; inset: 0; border-radius: inherit;
+  /* Match the native surface's normal-incidence reflection (IOR 1.52).
+     Window tint is already present; applying it again darkens the fallback. */
+  background: rgba(255,255,255,.04258);
+  box-shadow: inset 0 0 0 1px var(--glass-rim);
+}
+/* The explicit reading surface is frosted as one plane, including its edge.
+   The optical map still leaves the flat center unpainted to avoid sampling the
+   transparent WebView back into itself. */
+.glass-lens[data-glass-material="regular"] > .glass-lens-reflection {
+  backdrop-filter: blur(max(2px, var(--material-background-blur)));
+}
+.glass-lens[data-glass-material="reading"] > .glass-lens-reflection {
+  backdrop-filter: blur(max(4px, var(--material-background-blur)));
+}
+/* Content support retains uniform scattering and normal-incidence reflection,
+   without the curved optical rim used by floating controls. */
+.glass-lens[data-glass-material="reading"] > .glass-lens-reflection { box-shadow: none; }
+.glass-lens-shadow {
+  position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  box-shadow: var(--glass-shadow,var(--glass-control-shadow));
+}
+/* The retained native background stays visible during resize. CSS lenses keep
+   painting until the native controls have matching capture and geometry. */
+:root.theme-liquid-glass.native-glass-background-ready, body.theme-liquid-glass.native-glass-background-ready {
+  --shell-background: transparent;
+}
+body.theme-liquid-glass.native-glass-ready .glass-lens[data-native-glass="true"] :is(.glass-lens-refraction, .glass-lens-reflection) { display: none; }
+.native-glass-resize-handles { display: none; position: fixed; inset: 0; z-index: 10000; pointer-events: none; }
+body.theme-liquid-glass.native-glass-background-ready .native-glass-resize-handles { display: block; }
+.native-glass-resize-handles > span { position: absolute; pointer-events: auto; touch-action: none; }
+.native-glass-resize-handles :is([data-resize-direction="North"], [data-resize-direction="South"]) { left: 16px; right: 16px; height: 5px; cursor: ns-resize; }
+.native-glass-resize-handles :is([data-resize-direction="East"], [data-resize-direction="West"]) { top: 16px; bottom: 16px; width: 5px; cursor: ew-resize; }
+.native-glass-resize-handles [data-resize-direction="North"] { top: 0; }
+.native-glass-resize-handles [data-resize-direction="South"] { bottom: 0; }
+.native-glass-resize-handles [data-resize-direction="East"] { right: 0; }
+.native-glass-resize-handles [data-resize-direction="West"] { left: 0; }
+.native-glass-resize-handles :is([data-resize-direction="NorthEast"], [data-resize-direction="SouthEast"], [data-resize-direction="SouthWest"], [data-resize-direction="NorthWest"]) {
+  width: 16px; height: 16px;
+  clip-path: polygon(0 0, 100% 0, 100% 5px, 5px 5px, 5px 100%, 0 100%);
+}
+.native-glass-resize-handles [data-resize-direction="NorthWest"] { top: 0; left: 0; cursor: nwse-resize; }
+.native-glass-resize-handles [data-resize-direction="NorthEast"] { top: 0; right: 0; transform: rotate(90deg); cursor: nesw-resize; }
+.native-glass-resize-handles [data-resize-direction="SouthEast"] { bottom: 0; right: 0; transform: rotate(180deg); cursor: nwse-resize; }
+.native-glass-resize-handles [data-resize-direction="SouthWest"] { bottom: 0; left: 0; transform: rotate(270deg); cursor: nesw-resize; }
+@media (prefers-reduced-transparency: reduce), (forced-colors: active) {
+  .glass-lens-refraction { display: none; }
+  .glass-lens:is([data-glass-material="regular"], [data-glass-material="reading"]) > .glass-lens-reflection { backdrop-filter: none; }
+}
+@media (forced-colors: active) {
+  .glass-lens-reflection { background: Canvas; border: 1px solid ButtonText; box-shadow: none; }
+  .glass-lens-shadow { box-shadow: none; }
+  body.theme-liquid-glass .history-item.selected .glass-lens-reflection { border-color: Highlight; }
+  body.theme-liquid-glass .history-item :is(button, input):focus-visible { outline-color: Highlight; }
+}
 body.theme-liquid-glass .header-actions .btn-icon { border: 0; box-shadow: none; background: transparent; border-radius: 50%; }
 body.theme-liquid-glass .header-actions .btn-icon:hover { background: rgba(var(--accent-color-rgb),.09); }
 body.theme-liquid-glass .header-actions .btn-icon.active { background: var(--accent-color); color: var(--button-active-filled-color); }
 body.theme-liquid-glass .liquid-search .search-input { background: transparent; border: 0; box-shadow: none; min-height: 38px; }
-body.theme-liquid-glass .liquid-search:focus-within { border-color: var(--accent-color); box-shadow: 0 0 0 2px rgba(var(--accent-color-rgb),.14); }
+body.theme-liquid-glass .liquid-search:focus-within { --glass-rim: var(--accent-color); outline: 2px solid var(--accent-color); outline-offset: 2px; }
 body.theme-liquid-glass .search-icon { color: var(--text-secondary); }
-body.theme-liquid-glass .type-filter-btn { position: relative; isolation: isolate; min-height: 28px; border-color: transparent; background: transparent; }
-body.theme-liquid-glass .type-filter-btn.active { background: transparent; box-shadow: none; }
-body.theme-liquid-glass .type-filter-label { position: relative; z-index: 1; }
-.type-filter-selection { position: absolute; inset: 0; border-radius: inherit; background: var(--accent-color); box-shadow: 0 2px 5px rgba(var(--accent-color-rgb),.14); }
 body.theme-liquid-glass .tm-tag.active { background: var(--card-selected-background); border-color: rgba(var(--accent-color-rgb),.4); color: var(--accent-color); }
 body.theme-liquid-glass .tm-view-toggle, body.theme-liquid-glass .tm-view-toggle .tm-icon { border-radius: 999px; }
 body.theme-liquid-glass :is(.btn-icon, .tm-button, .tm-icon) { transition: scale .16s cubic-bezier(.2,.8,.2,1.15), background-color .16s ease, box-shadow .16s ease; }
 body.theme-liquid-glass :is(.btn-icon, .tm-button, .tm-icon):active { scale: .97; transform: none; }
-body.theme-liquid-glass .glass-transparency-slider::-webkit-slider-thumb {
-  width: 30px; height: 20px; border-radius: 999px; background: #fdfefe;
-  border: 1px solid rgba(35,57,83,.15); box-shadow: 0 2px 5px rgba(23,42,65,.18);
-  transition: scale .16s cubic-bezier(.2,.8,.2,1.15);
+.glass-slider-control { position: relative; width: 100%; display: flex; align-items: center; min-height: 30px; }
+.glass-slider-thumb { position: absolute; top: 4px; width: 30px; height: 22px; border-radius: 11px; pointer-events: none; isolation: isolate; --glass-shadow: 0 2px 5px rgba(23,42,65,.18); }
+body.theme-liquid-glass .glass-material-slider {
+  margin: 0; width: 100%;
+  border: 0; box-shadow: none;
+  --glass-track-inactive: rgba(var(--accent-color-rgb), .1);
+  background: linear-gradient(var(--accent-color), var(--accent-color)) 0/ var(--range-progress, 0%) 100% no-repeat, var(--glass-track-inactive);
 }
-body.theme-liquid-glass .glass-transparency-slider:active::-webkit-slider-thumb { scale: 1.08 1.02; }
+/* This track is included in the thumb's native refraction input. Its input
+   remains interactive; only the duplicate foreground paint is suppressed. */
+body.theme-liquid-glass.native-glass-ready .glass-slider-control:has(> .glass-slider-thumb > .glass-lens[data-native-glass="true"]) .glass-material-slider {
+  background: transparent; border-color: transparent; box-shadow: none;
+}
+body.theme-liquid-glass .glass-material-slider::-webkit-slider-thumb { width: 30px; height: 22px; border: 0; background: transparent; box-shadow: none; }
+.glass-slider-control:active .glass-slider-thumb { scale: 1.08 1.02; }
+body.theme-liquid-glass .glass-slider-control > .glass-material-slider:focus-visible { outline: none; }
+body.theme-liquid-glass .glass-slider-control:has(> .glass-material-slider:focus-visible) .glass-slider-thumb { outline: 2px solid var(--accent-color); outline-offset: 2px; }
+@media (forced-colors: active) {
+  body.theme-liquid-glass .glass-slider-control:has(> .glass-material-slider:focus-visible) .glass-slider-thumb { outline-color: Highlight; }
+}
 @media (prefers-reduced-motion: reduce) {
-  body.theme-liquid-glass :is(.btn-icon, .tm-button, .tm-icon), body.theme-liquid-glass .glass-transparency-slider::-webkit-slider-thumb { transition: none; scale: none; }
-  body.theme-liquid-glass :is(.btn-icon, .tm-button, .tm-icon):active, body.theme-liquid-glass .glass-transparency-slider:active::-webkit-slider-thumb { scale: none; }
+  body.theme-liquid-glass :is(.btn-icon, .tm-button, .tm-icon), body.theme-liquid-glass .glass-material-slider::-webkit-slider-thumb { transition: none; scale: none; }
+  body.theme-liquid-glass :is(.btn-icon, .tm-button, .tm-icon):active, body.theme-liquid-glass .glass-material-slider:active::-webkit-slider-thumb { scale: none; }
+  .glass-slider-control:active .glass-slider-thumb { scale: none; }
 }

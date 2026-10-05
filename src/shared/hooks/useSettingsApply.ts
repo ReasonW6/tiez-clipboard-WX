@@ -1,8 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { applyThemeClasses, normalizeThemeId } from "../config/themes";
 import { applyColorMode, applySurfaceSettings } from "../lib/appearance";
+import { startNativeGlass } from "../lib/nativeGlass";
 
 interface UseSettingsApplyOptions {
   theme: string;
@@ -22,6 +23,8 @@ export const useSettingsApply = ({
   theme, colorMode, compactMode, settingsLoaded, clipboardItemFontSize,
   clipboardTagFontSize, surfaceOpacity, showAppBorder
 }: UseSettingsApplyOptions) => {
+  const latestOpacity = useRef(surfaceOpacity);
+  latestOpacity.current = surfaceOpacity;
   useEffect(() => {
     let disposed = false;
     void invoke<{ is_windows_10: boolean; is_windows_11: boolean }>("get_platform_info").then(platform => {
@@ -40,13 +43,15 @@ export const useSettingsApply = ({
     const normalizedTheme = normalizeThemeId(theme);
     applyThemeClasses(normalizedTheme, document.documentElement, document.body);
     if (colorMode === "light" || colorMode === "dark") applyColorMode(colorMode);
+    const nativeGlass = normalizedTheme === "liquid-glass" ? startNativeGlass() : undefined;
 
     const updateNative = () => {
       nativeThemeUpdate = nativeThemeUpdate.catch(() => {}).then(async () => {
         if (disposed) return;
         await invoke("set_theme", {
-          theme: normalizedTheme, colorMode, showAppBorder
+          theme: normalizedTheme, colorMode, showAppBorder, surfaceOpacity: latestOpacity.current
         });
+        if (!disposed) await nativeGlass?.afterThemeApplied();
         // Query only after clearing the window's explicit mode when following the OS.
         if (colorMode === "system" && !disposed) {
           const mode = await getCurrentWindow().theme();
@@ -68,14 +73,23 @@ export const useSettingsApply = ({
       }).then(off => { if (disposed) off(); else unlisten = off; }).catch(console.error);
     }
     updateNative();
-    return () => { disposed = true; unlisten?.(); };
+    return () => { disposed = true; unlisten?.(); nativeGlass?.dispose(); };
   }, [theme, colorMode, settingsLoaded, showAppBorder]);
+
+  useEffect(() => {
+    if (!settingsLoaded || !["mica", "acrylic", "liquid-glass"].includes(theme)) return;
+    let disposed = false;
+    nativeThemeUpdate = nativeThemeUpdate.catch(() => {}).then(async () => {
+      if (!disposed) await invoke("set_material_opacity", { opacity: surfaceOpacity });
+    }).catch(error => console.error("Failed to apply material transparency", error));
+    return () => { disposed = true; };
+  }, [theme, surfaceOpacity, settingsLoaded]);
 
   useEffect(() => {
     if (!settingsLoaded) return;
     document.body.classList.toggle("compact-mode", compactMode);
     document.documentElement.style.setProperty("--clipboard-item-font-size", `${clipboardItemFontSize}px`);
     document.documentElement.style.setProperty("--clipboard-tag-font-size", `${clipboardTagFontSize}px`);
-    applySurfaceSettings(surfaceOpacity);
-  }, [compactMode, clipboardItemFontSize, clipboardTagFontSize, surfaceOpacity, settingsLoaded]);
+    applySurfaceSettings(surfaceOpacity, theme);
+  }, [theme, compactMode, clipboardItemFontSize, clipboardTagFontSize, surfaceOpacity, settingsLoaded]);
 };

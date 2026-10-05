@@ -1,3 +1,4 @@
+import GlassLens from "../../../shared/components/GlassLens";
 import { AnimatePresence, motion } from "framer-motion";
 import { open } from "@tauri-apps/plugin-dialog";
 import { X } from "lucide-react";
@@ -23,6 +24,7 @@ const AppSelectorModal = ({ show, installedApps, theme, colorMode, t, onClose, o
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0.9, opacity: 0 }}
                     className="modal-content"
+                    data-glass-css-only={theme === "liquid-glass" ? "true" : undefined}
                     style={{
                         width: '92%',
                         maxWidth: '500px',
@@ -36,7 +38,7 @@ const AppSelectorModal = ({ show, installedApps, theme, colorMode, t, onClose, o
                 >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                         <h3 className="modal-title">{t('select_app_title')}</h3>
-                        <button className="btn-icon" onClick={onClose} style={{ border: 'none', background: 'transparent', boxShadow: 'none' }}>
+                        <button className="btn-icon" onClick={onClose} style={{ border: 'none', background: 'transparent', boxShadow: 'none' }}>{theme === "liquid-glass" && <GlassLens radius={12} />}
                             <X size={18} />
                         </button>
                     </div>
@@ -74,14 +76,14 @@ const AppSelectorModal = ({ show, installedApps, theme, colorMode, t, onClose, o
                                 } catch (err) { console.error(err); }
                             }}
                             style={{ flex: 1, height: '36px', fontSize: '13px', fontWeight: 'bold', textTransform: 'uppercase' }}
-                        >
+                        >{theme === "liquid-glass" && <GlassLens radius={12} />}
                             {t('browse_file')}
                         </button>
                         <button
                             className="btn-icon"
                             onClick={onClose}
                             style={{ flex: 1, height: '36px', fontSize: '13px', fontWeight: 'bold', textTransform: 'uppercase', background: '#ff4d4f', color: '#fff', border: '2px solid #333' }}
-                        >
+                        >{theme === "liquid-glass" && <GlassLens radius={12} />}
                             {t('cancel')}
                         </button>
                     </div>

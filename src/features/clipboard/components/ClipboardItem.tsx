@@ -36,6 +36,7 @@ import {
     getTagTextColor
 } from "../../../shared/lib/utils";
 import HtmlContent from "../../../shared/components/HtmlContent";
+import GlassLens from "../../../shared/components/GlassLens";
 import { toTauriLocalImageSrc } from "../../../shared/lib/localImageSrc";
 import { getRichTextSnapshotDataUrl } from "../../../shared/lib/richTextSnapshot";
 import { getFileIcon as getSystemFileIcon, peekFileIcon } from "../../../shared/lib/fileIcon";
@@ -1269,7 +1270,7 @@ const ClipboardItem = ({
         >
             {item.tags?.map((tag) => {
                 const tagBackground = tagColors?.[tag] || getTagColor(tag, theme);
-                const tagTextColor = getTagTextColor(tagBackground);
+                const tagTextColor = getTagTextColor(tagBackground, theme);
                 return (
                     <span
                         key={tag}
@@ -1277,6 +1278,7 @@ const ClipboardItem = ({
                         style={{
                             background: tagBackground,
                             color: tagTextColor,
+                            filter: ["mica", "acrylic", "liquid-glass"].includes(theme) ? "none" : undefined,
                             display: 'flex',
                             alignItems: 'center',
                             gap: '4px'
@@ -1413,7 +1415,7 @@ const ClipboardItem = ({
                         >
                             {pickableTagSuggestions.map((sTag, sIdx) => {
                                 const bg = tagColors?.[sTag] || getTagColor(sTag, theme);
-                                const fg = getTagTextColor(bg);
+                                const fg = getTagTextColor(bg, theme);
                                 return (
                                     <button
                                         key={sTag}
@@ -1569,6 +1571,7 @@ const ClipboardItem = ({
                 void hideCompactPreview();
             }}
         >
+            {theme === "liquid-glass" && <GlassLens radius={16} material="regular" />}
             <div className="item-meta">
                 <div className="item-meta-left">
                     {dragControls && (
@@ -1790,11 +1793,11 @@ const ClipboardItem = ({
                 ) : (
                     isSensitiveHidden
                         ? (
-                            <div style={{ minHeight: '24px', opacity: 0.6, fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '8px', fontFamily: 'var(--font-mono)' }}>
+                            <div className="sensitive-preview" style={{ minHeight: '24px', opacity: 0.6, fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '8px', fontFamily: 'var(--font-mono)' }}>
                                 <span style={{ letterSpacing: '1px' }}>
                                     {sensitivePreview}
                                 </span>
-                                <span style={{ fontSize: '10px', opacity: 0.7 }}>
+                                <span className="sensitive-preview-length" style={{ fontSize: '10px', opacity: 0.7 }}>
                                     ({item.content.length} {t('chars') || 'chars'})
                                 </span>
                             </div>

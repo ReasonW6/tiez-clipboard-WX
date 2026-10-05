@@ -16,23 +16,39 @@ const alpha = (page: Page, selector: string) => page.locator(selector).first().e
 
 for (const theme of ["mica", "acrylic", "liquid-glass", "sakura"]) {
   for (const mode of ["light", "dark"]) {
-    test(`${theme} ${mode}: full opacity range affects shell and controls`, async ({ page }) => {
+    test(`${theme} ${mode}: transparency stays continuous within its readable surface range`, async ({ page }) => {
       await start(page, theme, mode);
       await appearance(page);
-      const slider = page.getByRole("slider", { name: theme === "liquid-glass" ? "液态玻璃透明度" : "界面不透明度" });
+      const slider = page.getByRole("slider", { name: theme === "liquid-glass" ? "液态玻璃透明度" : "界面透明度" });
       const values: number[] = [];
+      const fills: number[] = [];
       for (const opacity of [0, 1, 25, 50, 75, 99, 100]) {
-        await slider.fill(String(theme === "liquid-glass" ? 100 - opacity : opacity));
+        await slider.fill(String(100 - opacity));
         await expect.poll(() => page.evaluate(() => Number((window as any).testApp.settings["app.surface_opacity"]))).toBe(opacity);
         values.push(await alpha(page, "#root"));
-        expect(await alpha(page, ".settings-group")).toBeGreaterThanOrEqual(.89);
+        fills.push(await page.evaluate(() => Number(getComputedStyle(document.documentElement).getPropertyValue("--surface-fill"))));
+        if (theme === "sakura") expect(await alpha(page, ".settings-group")).toBeGreaterThanOrEqual(.89);
+        else expect(await alpha(page, ".settings-group")).toBe(0);
       }
-      expect(values[6] - values[0]).toBeGreaterThan(.7);
-      expect(values[1] - values[0]).toBeGreaterThan(0);
-      expect(values[1] - values[0]).toBeLessThan(.012);
-      expect(values[6] - values[5]).toBeGreaterThan(0);
-      expect(values[6] - values[5]).toBeLessThan(.012);
-      for (let i = 1; i < values.length; i++) expect(values[i]).toBeGreaterThan(values[i - 1]);
+      if (theme === "sakura") expect(values[6] - values[0]).toBeGreaterThan(.7);
+      else {
+        expect(fills[0]).toBeGreaterThanOrEqual(.7);
+        expect(fills[6]).toBeLessThan(1);
+        expect(fills[6] - fills[0]).toBeGreaterThan(.1);
+      }
+      expect(fills[1] - fills[0]).toBeGreaterThan(0);
+      expect(fills[1] - fills[0]).toBeLessThan(.012);
+      expect(fills[6] - fills[5]).toBeGreaterThan(0);
+      expect(fills[6] - fills[5]).toBeLessThan(.012);
+      for (let i = 0; i < values.length; i++) {
+        // Adjacent paint alphas can quantize to the same 8-bit value even while
+        // the underlying setting remains continuous.
+        expect(values[i]).toBeCloseTo(fills[i], 2);
+        if (i > 0) {
+          expect(fills[i]).toBeGreaterThan(fills[i - 1]);
+          expect(values[i]).toBeGreaterThanOrEqual(values[i - 1]);
+        }
+      }
       const last = values[6];
       await page.reload();
       await expect.poll(() => alpha(page, "#root")).toBe(last);
@@ -88,7 +104,7 @@ test("one transparency slider persists and ignores the removed blur option", asy
   await expect(page.getByRole("slider", { name: "液态玻璃透明度" })).toHaveValue("100");
 });
 
-test("selection moves with interaction and reduced motion disables press animation", async ({ page }) => {
+test("category selection keeps one lens per button and reduced motion disables press animation", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
   await page.emulateMedia({ reducedMotion: "no-preference" });
@@ -96,18 +112,20 @@ test("selection moves with interaction and reduced motion disables press animati
   const first = page.getByTitle("文本", { exact: true });
   const second = page.getByTitle("图片", { exact: true });
   await first.click();
-  await expect(first.locator(".type-filter-selection")).toHaveCount(1);
+  await expect(first).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".type-filter-btn > .glass-lens")).toHaveCount(7);
   const initial = await first.boundingBox();
   await second.click();
-  await expect(second.locator(".type-filter-selection")).toHaveCount(1);
-  await expect(first.locator(".type-filter-selection")).toHaveCount(0);
-  await expect.poll(async () => (await second.locator(".type-filter-selection").boundingBox())!.x).toBeGreaterThan(initial!.x);
+  await expect(second).toHaveAttribute("aria-pressed", "true");
+  await expect(first).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator(".type-filter-btn > .glass-lens")).toHaveCount(7);
+  expect(await first.boundingBox()).toEqual(initial);
   const settings = page.getByTitle("设置", { exact: true });
   await settings.hover(); await page.mouse.down();
   await expect(settings).toHaveCSS("scale", "0.97");
   await page.mouse.up();
   await page.evaluate(() => (window as any).testApp.emit("main-window-hidden"));
-  await expect(page.locator(".type-filter-selection")).toHaveCount(0);
+  await expect(page.locator(".type-filter-btn[aria-pressed=true]")).toHaveCount(0);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await settings.hover(); await page.mouse.down();
   await expect(settings).toHaveCSS("transition-duration", "0s");

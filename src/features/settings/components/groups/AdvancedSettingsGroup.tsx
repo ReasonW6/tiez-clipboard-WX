@@ -1,3 +1,5 @@
+import SettingsGlassField from "../SettingsGlassField";
+import GlassLens from "../../../../shared/components/GlassLens";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -8,6 +10,7 @@ import type { AppCleanupPolicy } from "../../types";
 
 
 interface AdvancedSettingsGroupProps {
+    theme: string;
     t: (key: string) => string;
     cleanupRules: string;
     setCleanupRules: (val: string) => void;
@@ -86,7 +89,7 @@ const focusEditorWindow = () => {
         .catch(() => invoke("focus_clipboard_window").catch(console.error));
 };
 
-const AdvancedSettingsGroup = ({
+const AdvancedSettingsGroup = ({ theme,
     t,
     cleanupRules,
     setCleanupRules,
@@ -368,22 +371,22 @@ const AdvancedSettingsGroup = ({
             >
                 <aside className="advanced-sidebar">
                     <div className="advanced-sidebar-search">
-                        <input
+                        <SettingsGlassField theme={theme}><input
                             className="search-input advanced-search-input"
                             placeholder={t("search_apps_placeholder")}
                             value={searchText}
                             onFocus={focusEditorWindow}
                             onChange={(e) => setSearchText(e.target.value)}
-                        />
+                        /></SettingsGlassField>
                         {searchResults.length > 0 && (
-                            <div className="advanced-search-results">
+                            <div className="advanced-search-results" data-glass-css-only={theme === "liquid-glass" ? "true" : undefined}>
                                 {searchResults.map((app) => (
                                     <button
                                         key={app.value}
                                         type="button"
                                         className="advanced-search-result-item"
                                         onClick={() => handleAddApp(app)}
-                                    >
+                                    >{theme === "liquid-glass" && <GlassLens radius={12} />}
                                         <span className="advanced-search-result-main">
                                             <span className="advanced-search-result-name">{app.label}</span>
                                         </span>
@@ -403,7 +406,7 @@ const AdvancedSettingsGroup = ({
                                 type="button"
                                 className={`advanced-target-item ${selectedTarget?.id === target.id ? "active" : ""}`}
                                 onClick={() => setSelectedSourceId(target.id)}
-                            >
+                            >{theme === "liquid-glass" && <GlassLens radius={12} />}
                                 <span className="advanced-target-meta">
                                     <span className="advanced-target-name">{target.label}</span>
                                     <span className="advanced-target-sub">
@@ -440,7 +443,7 @@ const AdvancedSettingsGroup = ({
                 <div className="advanced-editor">
                     <div className="advanced-editor-toolbar">
                         {selectedTarget?.kind === "global" || (appCleanupPolicies.find(p => p.id === selectedTarget.policyId || p.appPath === selectedTarget.appPath)?.action !== "ignore") ? (
-                            <button type="button" className="btn-icon advanced-add-rule-btn" onClick={addRule}>
+                            <button type="button" className="btn-icon advanced-add-rule-btn" onClick={addRule}>{theme === "liquid-glass" && <GlassLens radius={12} />}
                                 <Plus size={14} />
                                 <span>{t("advanced_add_rule")}</span>
                             </button>
@@ -462,7 +465,7 @@ const AdvancedSettingsGroup = ({
                                 type="button" 
                                 className={`advanced-action-switch ${appCleanupPolicies.find(p => p.id === selectedTarget.policyId || p.appPath === selectedTarget.appPath)?.action !== "ignore" ? "active" : ""}`}
                                 onClick={toggleTargetAction}
-                            >
+                            >{theme === "liquid-glass" && <GlassLens radius={12} />}
                                 <span className="advanced-action-switch-track">
                                     <span className="advanced-action-switch-thumb" />
                                 </span>
@@ -505,7 +508,7 @@ const AdvancedSettingsGroup = ({
                                                 type="button"
                                                 className="advanced-rule-header"
                                                 onClick={() => setExpandedRuleIndex(expanded ? null : index)}
-                                            >
+                                            >{theme === "liquid-glass" && <GlassLens radius={12} />}
                                                 <span className="advanced-rule-title">
                                                     {rule.label?.trim() || `${t("advanced_rule_label")} ${index + 1}`}
                                                 </span>
@@ -516,24 +519,24 @@ const AdvancedSettingsGroup = ({
                                                 <div className="advanced-rule-body">
                                                     <div className="advanced-rule-field">
                                                         <label>{t("advanced_rule_label_name")}</label>
-                                                        <input
+                                                        <SettingsGlassField theme={theme}><input
                                                             type="text"
                                                             className="search-input advanced-rule-input"
                                                             value={rule.label ?? ""}
                                                             placeholder={`${t("advanced_rule_label")} ${index + 1}`}
                                                             onFocus={focusEditorWindow}
                                                             onChange={(e) => updateRule(index, { label: e.target.value })}
-                                                        />
+                                                        /></SettingsGlassField>
                                                     </div>
                                                     <div className="advanced-rule-field">
                                                         <label>{t("advanced_match_label")}</label>
-                                                        <textarea
+                                                        <SettingsGlassField theme={theme}><textarea
                                                             className="search-input advanced-rule-textarea"
                                                             value={rule.match}
                                                             placeholder={t("advanced_match_placeholder")}
                                                             onFocus={focusEditorWindow}
                                                             onChange={(e) => updateRule(index, { match: e.target.value })}
-                                                        />
+                                                        /></SettingsGlassField>
                                                     </div>
 
                                                     <div className="advanced-rule-field">
@@ -543,14 +546,14 @@ const AdvancedSettingsGroup = ({
                                                                 type="button" 
                                                                 className={`advanced-rule-action-tab ${rule.actionType === "replace" ? "active" : ""}`}
                                                                 onClick={() => updateRule(index, { actionType: "replace" })}
-                                                            >
+                                                            >{theme === "liquid-glass" && <GlassLens radius={12} />}
                                                                 {t("advanced_replace_label")}
                                                             </button>
                                                             <button 
                                                                 type="button" 
                                                                 className={`advanced-rule-action-tab ${rule.actionType === "ignore" ? "active" : ""}`}
                                                                 onClick={() => updateRule(index, { actionType: "ignore" })}
-                                                            >
+                                                            >{theme === "liquid-glass" && <GlassLens radius={12} />}
                                                                 {t("app_cleanup_policy_ignore")}
                                                             </button>
                                                         </div>
@@ -559,13 +562,13 @@ const AdvancedSettingsGroup = ({
                                                     {rule.actionType === "replace" && (
                                                         <div className="advanced-rule-field">
                                                             <label>{t("advanced_replace_label")}</label>
-                                                            <textarea
+                                                            <SettingsGlassField theme={theme}><textarea
                                                                 className="search-input advanced-rule-textarea"
                                                                 value={rule.replace}
                                                                 placeholder={t("advanced_replace_placeholder")}
                                                                 onFocus={focusEditorWindow}
                                                                 onChange={(e) => updateRule(index, { replace: e.target.value })}
-                                                            />
+                                                            /></SettingsGlassField>
                                                         </div>
                                                     )}
 
@@ -574,7 +577,7 @@ const AdvancedSettingsGroup = ({
                                                             type="button"
                                                             className="btn-icon advanced-delete-btn"
                                                             onClick={() => deleteRule(index)}
-                                                        >
+                                                        >{theme === "liquid-glass" && <GlassLens radius={12} />}
                                                             <Trash2 size={14} />
                                                             <span>{t("delete")}</span>
                                                         </button>

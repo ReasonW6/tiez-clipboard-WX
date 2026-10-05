@@ -1,3 +1,4 @@
+import GlassLens from "../../../shared/components/GlassLens";
 import { Github, MessageSquare, RotateCcw, X, ArrowUpCircle } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { check, type Update } from "@tauri-apps/plugin-updater";
@@ -5,6 +6,7 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { useState } from "react";
 
 interface SettingsFooterProps {
+    theme: string;
     t: (key: string) => string;
     appVersion: string;
     updateStatus: string;
@@ -14,7 +16,7 @@ interface SettingsFooterProps {
     setEmailCopied: (val: boolean) => void;
 }
 
-const SettingsFooter = ({
+const SettingsFooter = ({ theme,
     t,
     appVersion,
     updateStatus,
@@ -24,6 +26,9 @@ const SettingsFooter = ({
     setEmailCopied
 }: SettingsFooterProps) => {
     const [pendingUpdate, setPendingUpdate] = useState<Update | null>(null);
+    const actionTransition = ["liquid-glass", "mica", "acrylic"].includes(theme)
+        ? "box-shadow 0.2s, transform 0.2s, opacity 0.2s"
+        : "all 0.2s";
 
     const handleInstallUpdate = async () => {
         if (!pendingUpdate) return;
@@ -76,7 +81,7 @@ const SettingsFooter = ({
                     justifyContent: 'center',
                     padding: '24px'
                 }}>
-                    <div className="settings-group" style={{
+                    <div className="settings-group" data-glass-css-only={theme === "liquid-glass" ? "true" : undefined} style={{
                         maxWidth: '320px',
                         width: '100%',
                         padding: '16px',
@@ -94,7 +99,7 @@ const SettingsFooter = ({
                             <button
                                 onClick={() => setPendingUpdate(null)}
                                 style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}
-                            >
+                            >{theme === "liquid-glass" && <GlassLens radius={12} />}
                                 <X size={18} />
                             </button>
                         </div>
@@ -186,7 +191,7 @@ const SettingsFooter = ({
                                     borderRadius: '12px'
                                 }}
                                 onClick={() => setPendingUpdate(null)}
-                            >
+                            >{theme === "liquid-glass" && <GlassLens radius={12} />}
                                 {t('later') || '稍后再说'}
                             </button>
                             <button
@@ -201,7 +206,7 @@ const SettingsFooter = ({
                                     borderRadius: '12px'
                                 }}
                                 onClick={handleInstallUpdate}
-                            >
+                            >{theme === "liquid-glass" && <GlassLens radius={12} />}
                                 {t('install_now') || '立即安装'}
                             </button>
                         </div>
@@ -222,7 +227,7 @@ const SettingsFooter = ({
                     className="settings-group"
                     style={{
                         cursor: 'pointer',
-                        transition: 'all 0.2s',
+                        transition: actionTransition,
                         margin: 0,
                         width: 'auto',
                         padding: '10px 16px',
@@ -237,6 +242,7 @@ const SettingsFooter = ({
                         setTimeout(() => setEmailCopied(false), 2000);
                     }}
                 >
+                    {theme === "liquid-glass" && <GlassLens radius={12} />}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <MessageSquare size={16} />
                         <span style={{ fontSize: '13px', fontWeight: 600 }}>
@@ -247,10 +253,10 @@ const SettingsFooter = ({
 
                 {/* Reset Card */}
                 <div
-                    className="settings-group"
+                    className="settings-group settings-danger-action"
                     style={{
                         cursor: 'pointer',
-                        transition: 'all 0.2s',
+                        transition: actionTransition,
                         margin: 0,
                         width: 'auto',
                         padding: '10px 16px',
@@ -261,6 +267,7 @@ const SettingsFooter = ({
                     }}
                     onClick={() => onResetSettings()}
                 >
+                    {theme === "liquid-glass" && <GlassLens radius={12} />}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <RotateCcw size={16} />
                         <span style={{ fontSize: '13px', fontWeight: 600 }}>{t('reset_defaults')}</span>
@@ -269,7 +276,7 @@ const SettingsFooter = ({
             </div>
 
             {/* Version Info */}
-            <div style={{
+            <div className="settings-footer-meta" style={{
                 marginTop: '16px',
                 marginBottom: '32px',
                 textAlign: 'center',
@@ -317,11 +324,11 @@ const SettingsFooter = ({
                             borderRadius: '4px',
                             opacity: updateStatus ? 1 : 0.8,
                             fontWeight: updateStatus ? 'bold' : 'normal',
-                            transition: 'all 0.2s'
+                            transition: actionTransition
                         }}
                         onMouseEnter={(e) => !updateStatus && (e.currentTarget.style.opacity = '1')}
                         onMouseLeave={(e) => !updateStatus && (e.currentTarget.style.opacity = '0.8')}
-                    >
+                    >{theme === "liquid-glass" && <GlassLens radius={12} />}
                         {(updateStatus && !updateStatus.includes('%')) ? updateStatus : t('check_update')}
                     </button>
                 </div>
@@ -355,7 +362,7 @@ const SettingsFooter = ({
                         }}
                         onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
                         onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.7')}
-                    >
+                    >{theme === "liquid-glass" && <GlassLens radius={12} />}
                         {t('official_website')}
                     </button>
                     <button
@@ -376,7 +383,7 @@ const SettingsFooter = ({
                         }}
                         onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
                         onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.7')}
-                    >
+                    >{theme === "liquid-glass" && <GlassLens radius={12} />}
                         <Github size={12} />
                         <span>GitHub</span>
                     </button>

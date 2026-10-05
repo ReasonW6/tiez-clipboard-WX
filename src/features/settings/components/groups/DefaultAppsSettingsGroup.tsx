@@ -1,7 +1,9 @@
+import GlassLens from "../../../../shared/components/GlassLens";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type { DefaultAppsMap, InstalledAppOption } from "../../../app/types";
 
 interface DefaultAppsSettingsGroupProps {
+    theme: string;
     t: (key: string) => string;
     collapsed: boolean;
     onToggle: () => void;
@@ -11,7 +13,7 @@ interface DefaultAppsSettingsGroupProps {
     setShowAppSelector: (val: string | null) => void;
 }
 
-const DefaultAppsSettingsGroup = ({
+const DefaultAppsSettingsGroup = ({ theme,
     t,
     collapsed,
     onToggle,
@@ -36,7 +38,7 @@ const DefaultAppsSettingsGroup = ({
 
     return (
         <div className={`settings-group ${collapsed ? 'collapsed' : ''}`}>
-            <div className="group-header" onClick={onToggle}>
+            <div className="group-header" onClick={onToggle}>{theme === "liquid-glass" && <GlassLens radius={12} />}
                 <h3 style={{ margin: 0 }}>{t('default_apps')}</h3>
                 {collapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
             </div>
@@ -51,12 +53,13 @@ const DefaultAppsSettingsGroup = ({
                                     onClick={() => setShowAppSelector(type)}
                                     title={t('change_app')}
                                     style={{ width: 'auto', padding: '4px 12px', fontSize: '10px', textTransform: 'uppercase', height: '24px' }}
-                                >
+                                >{theme === "liquid-glass" && <GlassLens radius={12} />}
                                     {t('change_app')}
                                 </button>
                             </div>
 
-                            <div onClick={() => setShowAppSelector(type)} className="data-panel" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div onClick={() => setShowAppSelector(type)} className="data-panel" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{theme === "liquid-glass" && <GlassLens radius={12} />}
+                                <span className="settings-data-text">
                                 {appSettings[`app.${type}`]
                                     ? (() => {
                                         const path = appSettings[`app.${type}`];
@@ -68,6 +71,7 @@ const DefaultAppsSettingsGroup = ({
                                         return filename.replace(/\.exe$/i, '');
                                     })()
                                     : (defaultApps[type] ? `${t('system_default')} (${defaultApps[type].replace(/\.exe$/i, '')})` : t('not_configured'))}
+                                </span>
                             </div>
                         </div>
                     ))}

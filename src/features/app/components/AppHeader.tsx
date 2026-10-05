@@ -13,6 +13,11 @@ import {
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { getTagColor, getTagTextColor } from "../../../shared/lib/utils";
+import ClipboardTypeFilter from "./ClipboardTypeFilter";
+import GlassLens from "../../../shared/components/GlassLens";
+
+// Release the inline transform after projection so each theme keeps its CSS hover motion.
+const buttonTransform = (_values: unknown, transform: string) => transform === "none" ? "" : transform;
 
 interface AppHeaderProps {
   t: (key: string) => string;
@@ -79,6 +84,18 @@ const AppHeader = ({
   setTypeFilter,
   onBack
 }: AppHeaderProps) => {
+  const secondaryActionsVisible = !showSettings && !showTagManager && !showEmojiPanel;
+  // Retain layout snapshots while these actions are absent from the row. Newly
+  // mounted buttons otherwise start at full spacing inside a shrinking parent.
+  const secondaryActionProps = {
+    layout: "position" as const,
+    transformTemplate: buttonTransform,
+    disabled: !secondaryActionsVisible,
+    "aria-hidden": !secondaryActionsVisible || undefined,
+    tabIndex: secondaryActionsVisible ? undefined : -1,
+    animate: { opacity: secondaryActionsVisible ? 1 : 0 },
+    transition: { opacity: { duration: .12 } }
+  };
   const getTypeName = (type: string) => {
     switch (type) {
       case "code": return t('type_code');
@@ -97,7 +114,8 @@ const AppHeader = ({
     <div className="header-top">
       <div className="header-leading">
         {(showSettings || showTagManager || showEmojiPanel) && (
-          <button className="btn-icon window-no-drag" onClick={onBack}>
+          <button className="btn-icon header-back window-no-drag" aria-label={t('back')} onClick={onBack}>
+            {theme === "liquid-glass" && <GlassLens radius={16} />}
             <ChevronLeft size={18} />
           </button>
         )}
@@ -113,9 +131,10 @@ const AppHeader = ({
           </span>
         </div>
       </div>
-      <motion.div layout="size" className="header-actions window-no-drag">
+      <motion.div layout className="header-actions window-no-drag">
+        {theme === "liquid-glass" && <GlassLens />}
         {/* Pin Button - Always visible but single instance */}
-        <button
+        <motion.button layout="position" transformTemplate={buttonTransform}
           className={`btn-icon ${isWindowPinned ? 'active' : ''}`}
           title={t('pin')}
           onClick={() => {
@@ -125,34 +144,30 @@ const AppHeader = ({
           }}
         >
           {isWindowPinned ? <PinOff size={16} /> : <Pin size={16} />}
-        </button>
+        </motion.button>
 
-        {!showSettings && !showTagManager && !showEmojiPanel && (
-          <>
-            <button className="btn-icon" title={t('clear_history')} onClick={clearHistory}>
-              <Trash2 size={16} />
-            </button>
-            {tagManagerEnabled && (
-              <button className="btn-icon" title={t('tag_manager') || '标签管理'} onClick={() => setShowTagManager(true)}>
-                <Tag size={16} />
-              </button>
-            )}
-            {emojiPanelEnabled && (
-              <button className="btn-icon" title={t('emoji_panel') || '表情包'} onClick={() => setShowEmojiPanel(true)}>
-                <Smile size={16} />
-              </button>
-            )}
-            <button className="btn-icon" title={t('settings')} onClick={() => setShowSettings(true)}>
-              <SettingsIcon size={16} />
-            </button>
-          </>
+        <motion.button {...secondaryActionProps} className="btn-icon" title={t('clear_history')} onClick={clearHistory}>
+          <Trash2 size={16} />
+        </motion.button>
+        {tagManagerEnabled && (
+          <motion.button {...secondaryActionProps} className="btn-icon" title={t('tag_manager') || '标签管理'} onClick={() => setShowTagManager(true)}>
+            <Tag size={16} />
+          </motion.button>
         )}
+        {emojiPanelEnabled && (
+          <motion.button {...secondaryActionProps} className="btn-icon" title={t('emoji_panel') || '表情包'} onClick={() => setShowEmojiPanel(true)}>
+            <Smile size={16} />
+          </motion.button>
+        )}
+        <motion.button {...secondaryActionProps} className="btn-icon" title={t('settings')} onClick={() => setShowSettings(true)}>
+          <SettingsIcon size={16} />
+        </motion.button>
 
-        <button className="btn-icon" title={t('hide')} onClick={async () => {
+        <motion.button layout="position" transformTemplate={buttonTransform} className="btn-icon" title={t('hide')} onClick={async () => {
           invoke("hide_window_cmd").catch(console.error);
         }}>
           <X size={16} />
-        </button>
+        </motion.button>
       </motion.div>
     </div>
 
@@ -172,6 +187,7 @@ const AppHeader = ({
           >
             <div className="search-container window-no-drag">
               <div className={theme === 'liquid-glass' ? 'liquid-search' : undefined} style={{ position: 'relative' }}>
+                {theme === 'liquid-glass' && <GlassLens />}
                 <Search size={14} className="search-icon" />
                 <input
                   ref={searchInputRef}
@@ -221,7 +237,8 @@ const AppHeader = ({
                               setShowTagFilter(false);
                             }}
                             data-tag={tag}
-                            style={{ background: tagBackground, color: getTagTextColor(tagBackground) }}
+                            style={{ background: tagBackground, color: getTagTextColor(tagBackground, theme),
+                              filter: ["mica", "acrylic", "liquid-glass"].includes(theme) ? "none" : undefined }}
                           >
                             {tag}
                           </span>
@@ -231,43 +248,7 @@ const AppHeader = ({
                   </div>
                 )}
               </div>
-              <div
-                className="hide-scrollbar"
-                style={{
-                  display: 'flex',
-                  gap: '6px',
-                  padding: '8px 0 0 0',
-                  overflowX: 'auto',
-                  scrollbarWidth: 'none',
-                  msOverflowStyle: 'none'
-                }}
-                onWheel={(e) => {
-                  if (e.deltaY !== 0) {
-                    e.currentTarget.scrollLeft += e.deltaY;
-                  }
-                }}
-              >
-                {['text', 'image', 'file', 'url', 'code', 'video', 'rich_text'].map(t => (
-                  <button
-                    key={t}
-                    className={`btn-icon type-filter-btn ${typeFilter === t ? 'active' : ''}`}
-                    onClick={() => setTypeFilter(typeFilter === t ? null : t)}
-                    style={{
-                      width: 'auto',
-                      padding: '4px 8px',
-                      fontSize: '11px',
-                      borderRadius: theme === 'liquid-glass' ? '999px' : '4px',
-                      whiteSpace: 'nowrap',
-                      flexShrink: 0,
-                      opacity: 1
-                    }}
-                    title={getTypeName(t)}
-                  >
-                    {theme === 'liquid-glass' && typeFilter === t && <motion.span className="type-filter-selection" layoutId="clipboard-type-selection" transition={{ type: 'spring', stiffness: 420, damping: 30 }} />}
-                    <span className="type-filter-label">{getTypeName(t)}</span>
-                  </button>
-                ))}
-              </div>
+              <ClipboardTypeFilter theme={theme} value={typeFilter} onChange={setTypeFilter} label={getTypeName} />
 
             </div>
           </motion.div>

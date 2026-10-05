@@ -72,3 +72,19 @@ fn review_unlisted_window_cannot_query_native_theme() {
     let window = test_window(&app, "unlisted");
     assert!(request(&window, "plugin:window|theme", json!({"label": "unlisted"})).is_err());
 }
+
+#[test]
+fn review_native_resize_uses_authorized_public_window_commands() {
+    let app = test_app();
+    let window = test_window(&app, "main");
+    for command in ["plugin:window|is_resizable", "plugin:window|is_maximized", "plugin:window|is_fullscreen"] {
+        assert!(request(&window, command, json!({"label": "main"})).unwrap().is_boolean());
+    }
+    for direction in ["North", "NorthEast", "East", "SouthEast", "South", "SouthWest", "West", "NorthWest"] {
+        assert_eq!(request(
+            &window,
+            "plugin:window|start_resize_dragging",
+            json!({"label": "main", "value": direction}),
+        ), Ok(Value::Null), "Resize permission failed for {direction}");
+    }
+}

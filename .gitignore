@@ -28,6 +28,8 @@ src-tauri/signer.key.pub
 *.log
 *.tmp
 *.tsbuildinfo
+__pycache__/
+*.py[cod]
 
 # OS/editor
 .DS_Store

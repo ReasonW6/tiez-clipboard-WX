@@ -11,10 +11,25 @@ export const applyColorMode = (mode: "light" | "dark") => {
 export const clampSurfaceOpacity = (value: number) => Number.isFinite(value)
   ? Math.min(100, Math.max(0, value)) : 50;
 
-// Regular material: a continuous tint range above a stable native backdrop.
-// Content retains its own contrast floor, including over a dark desktop.
-export const getMaterialSurfaces = (opacity: number) => {
+// Neutral native blur cannot adjust desktop luminance. A single window tint
+// therefore retains enough coverage for the fixed light/dark text palettes,
+// even at maximum transparency. Child surfaces only add small same-color lifts.
+export const getMaterialSurfaces = (opacity: number, theme = DEFAULT_THEME) => {
   const density = clampSurfaceOpacity(opacity) / 100;
+  const profiles: Record<string, { minFill: number; maxFill: number; minBlur: number; maxBlur: number }> = {
+    "liquid-glass": { minFill: .74, maxFill: .90, minBlur: 1.5, maxBlur: 16 },
+    acrylic: { minFill: .74, maxFill: .90, minBlur: 18, maxBlur: 38 },
+    mica: { minFill: .86, maxFill: .98, minBlur: 32, maxBlur: 56 }
+  };
+  const profile = profiles[theme];
+  if (profile) return {
+    window: profile.minFill + density * (profile.maxFill - profile.minFill),
+    content: .025 + density * .075,
+    control: .045 + density * .115,
+    toolbar: 0,
+    backgroundBlur: profile.minBlur + density * (profile.maxBlur - profile.minBlur)
+  };
+  // Preserve the existing range of decorative, non-material themes.
   return {
     window: .22 + density * .74,
     content: .90 + density * .08,
@@ -24,16 +39,19 @@ export const getMaterialSurfaces = (opacity: number) => {
   };
 };
 
-export const applySurfaceSettings = (opacity: number) => {
+export const applySurfaceSettings = (opacity: number, theme = DEFAULT_THEME) => {
   const value = clampSurfaceOpacity(opacity);
-  const material = getMaterialSurfaces(value);
+  const material = getMaterialSurfaces(value, theme);
   const root = document.documentElement;
+  const grain = theme === "acrylic" ? .02 + value / 100 * .025 : theme === "mica" ? .004 + value / 100 * .008 : 0;
+  root.style.setProperty("--material-grain-opacity", String(grain));
   root.style.setProperty("--surface-opacity", String(value / 100));
   root.style.setProperty("--surface-fill", String(material.window));
   root.style.setProperty("--material-content-opacity", String(material.content));
   root.style.setProperty("--material-control-opacity", String(material.control));
   root.style.setProperty("--material-toolbar-opacity", String(material.toolbar));
   root.style.setProperty("--material-background-blur", `${material.backgroundBlur}px`);
+  root.style.setProperty("--material-outline-opacity", String(.14 - value / 100 * .04));
 };
 
 export const initializeAppearance = () => {
@@ -45,7 +63,7 @@ export const initializeAppearance = () => {
     mode = localStorage.getItem("tiez_color_mode") || "system";
     opacity = Number(localStorage.getItem("tiez_surface_opacity") ?? 50);
   } catch { /* SQLite settings will still load after startup. */ }
-  applySurfaceSettings(opacity);
+  applySurfaceSettings(opacity, theme);
   applyThemeClasses(theme, document.documentElement, document.body);
   applyColorMode(mode === "dark" || (mode !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches)
     ? "dark" : "light");

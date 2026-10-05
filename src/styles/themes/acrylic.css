@@ -1,22 +1,17 @@
-/* Native acrylic supplies one stable backdrop; foreground surfaces preserve contrast. */
+/* Frosted acrylic: diffuse light, stronger grain, softly rounded surfaces. */
 :root.theme-acrylic, body.theme-acrylic {
-  --bg-window: rgba(242,246,251,var(--surface-fill));
-  --bg-panel: rgba(253,254,255,var(--material-content-opacity));
-  --bg-input: rgba(255,255,255,var(--material-control-opacity));
-  --bg-element: rgba(253,254,255,var(--material-content-opacity));
-  --bg-button: rgba(255,255,255,var(--material-control-opacity));
+  --material-rgb: 244, 246, 249;
+  --material-grain: var(--material-grain-opacity,.0325);
   --shell-backdrop-filter: none;
+  --input-radius: 12px;
+  --card-radius: 14px;
 }
 :root.theme-acrylic.dark-mode, body.theme-acrylic.dark-mode {
-  --bg-window: rgba(26,34,46,var(--surface-fill));
-  --bg-panel: rgba(37,46,60,var(--material-content-opacity));
-  --bg-input: rgba(42,53,69,var(--material-control-opacity));
-  --bg-element: rgba(37,46,60,var(--material-content-opacity));
-  --bg-button: rgba(42,53,69,var(--material-control-opacity));
+  --material-rgb: 28, 33, 41;
 }
 
 :root.theme-acrylic, body.theme-acrylic {
-  --card-border: 1px solid rgba(45,62,86,.09);
+  --card-border: 1px solid var(--line-soft);
   --card-shadow: 0 2px 7px rgba(24,43,67,.04);
 }
-:root.theme-acrylic.dark-mode, body.theme-acrylic.dark-mode { --card-border: 1px solid rgba(220,233,255,.12); }
+:root.theme-acrylic.dark-mode, body.theme-acrylic.dark-mode { --card-border: 1px solid var(--line-soft); }
