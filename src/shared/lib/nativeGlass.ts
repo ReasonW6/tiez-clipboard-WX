@@ -234,7 +234,13 @@ export function startNativeGlass() {
   let transparencyAllowed = !reducedTransparency.matches && !forcedColors.matches;
   const current = () => !disposed && currentGeneration === generation;
   const updateSubmittedGeometry = () => {
-    submittedGeometry = latestStatus?.state === "ready" ? receipts.get(latestStatus.geometryRevision) : undefined;
+    const acknowledged = latestStatus?.state === "ready" ? receipts.get(latestStatus.geometryRevision) : undefined;
+    // A frame event can beat its IPC reply. While our geometry is in flight the
+    // unknown revision is that newest submission, so keep judging against the
+    // previous receipt until the reply names it. Revoking every lens here made
+    // animated controls alternate renderers on every frame.
+    if (!acknowledged && latestStatus?.state === "ready" && sendingGeometry && submittedGeometry) return;
+    submittedGeometry = acknowledged;
     // A status event can arrive without another rendering opportunity. Revoke
     // old handoffs immediately; only measurement may confirm a new footprint.
     if (!submittedGeometry) for (const lens of lenses) lens.element.dataset.nativeGlass = "false";
