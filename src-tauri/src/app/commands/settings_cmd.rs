@@ -406,8 +406,8 @@ pub fn reset_settings(
     let main_hotkey = state
         .settings_repo
         .get("app.hotkey")
-        .unwrap_or(Some("Alt+C".to_string()))
-        .unwrap_or("Alt+C".to_string());
+        .unwrap_or(Some("Alt+V".to_string()))
+        .unwrap_or("Alt+V".to_string());
     let sequential_mode = state
         .settings_repo
         .get("app.sequential_mode")
@@ -417,8 +417,8 @@ pub fn reset_settings(
     let seq_hotkey = state
         .settings_repo
         .get("app.sequential_hotkey")
-        .unwrap_or(Some("Alt+V".to_string()))
-        .unwrap_or("Alt+V".to_string());
+        .unwrap_or(Some("Ctrl+Alt+V".to_string()))
+        .unwrap_or("Ctrl+Alt+V".to_string());
     let rich_hotkey = state
         .settings_repo
         .get("app.rich_paste_hotkey")

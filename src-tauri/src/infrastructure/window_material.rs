@@ -74,7 +74,7 @@ pub struct GlassGeometry {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct GlassTrack {
     pub x: f32,
@@ -98,7 +98,7 @@ pub enum GlassSurfaceMaterial {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
 pub struct GlassControl {
     pub x: f32,
     pub y: f32,
@@ -113,6 +113,18 @@ pub struct GlassControl {
 }
 
 impl GlassGeometry {
+    fn same_footprint(&self, other: &Self) -> bool {
+        self.viewport_width == other.viewport_width
+            && self.viewport_height == other.viewport_height
+            && self.controls.len() == other.controls.len()
+            && self.controls.iter().zip(&other.controls).all(|(a, b)| {
+                let (mut a, mut b) = (*a, *b);
+                a.pressure = 0.0;
+                b.pressure = 0.0;
+                a == b
+            })
+    }
+
     fn validate(&self) -> Result<(), String> {
         if !self.viewport_width.is_finite()
             || !self.viewport_height.is_finite()
@@ -842,8 +854,15 @@ pub fn submit_geometry(window: &WebviewWindow, geometry: GlassGeometry) -> Resul
             }
             let engine = state.as_mut().unwrap();
             engine.ensure_window(id, target);
-            let revision = GEOMETRY_REVISION.fetch_add(1, Ordering::Relaxed);
             let window = engine.windows.get_mut(&id).unwrap();
+            // Pressure animates inside the already submitted footprint. Giving
+            // every sample a new receipt makes early frame events revoke all
+            // CSS/native handoffs while their IPC reply is still in flight.
+            let revision = if window.geometry.as_ref().is_some_and(|previous| previous.same_footprint(&geometry)) {
+                window.geometry_revision
+            } else {
+                GEOMETRY_REVISION.fetch_add(1, Ordering::Relaxed)
+            };
             window.geometry = Some(geometry);
             window.geometry_revision = revision;
             engine.reconcile(id, false)?;
@@ -1031,6 +1050,35 @@ mod tests {
         }
         assert!(status.transition("ready", 42));
         assert_eq!(status.geometry_revision, 42);
+    }
+
+    #[test]
+    fn pressure_updates_keep_the_receipt_but_surface_changes_require_a_new_one() {
+        let original: GlassGeometry = serde_json::from_value(serde_json::json!({
+            "viewportWidth": 425, "viewportHeight": 589,
+            "controls": [
+                { "x": 10, "y": 20, "width": 200, "height": 40, "radius": 20, "pressure": 0 },
+                { "x": 10, "y": 80, "width": 200, "height": 40, "radius": 20, "pressure": 0 }
+            ]
+        })).unwrap();
+        let mut pressed = original.clone();
+        pressed.controls[0].pressure = 0.8;
+        assert!(original.same_footprint(&pressed));
+        let mut status = NativeGlassStatus { state: "ready", revision: 1, geometry_revision: 41 };
+        assert!(!status.transition("ready", 41));
+        for change in 0..7 {
+            let mut changed = pressed.clone();
+            match change {
+                0 => changed.viewport_height += 1.0,
+                1 => changed.controls[0].x += 1.0,
+                2 => changed.controls[0].width += 1.0,
+                3 => changed.controls[0].radius -= 1.0,
+                4 => changed.controls[0].material = GlassSurfaceMaterial::Regular,
+                5 => changed.controls[0].track.progress = 0.5,
+                _ => changed.controls.swap(0, 1),
+            }
+            assert!(!original.same_footprint(&changed), "surface change {change}");
+        }
     }
 
     #[test]

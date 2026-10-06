@@ -28,7 +28,7 @@ $result = $LASTEXITCODE
 $negativeControls = @()
 if ($result -eq 0) {
     $policyText = Get-Content -LiteralPath $policy -Raw
-    $functionPattern = '(?s)inline bool z_order_request_is_noop\(.*?\r?\n}\r?\n(?=\r?\nstruct ZOrderNoopGate)'
+    $functionPattern = '(?s)inline bool z_order_request_is_noop\(.*?\r?\n}\r?\n(?=\r?\ninline bool translation_order_is_unchanged)'
     if ([regex]::Matches($policyText, $functionPattern).Count -ne 1) { throw 'Expected one production classifier.' }
     $earlyCheck = 'return current(token) && default_returned && within_deadline(now) && same_z_order(order, snapshot);'
     if (-not $policyText.Contains($earlyCheck)) { throw 'Expected the production default-procedure completion gate.' }
@@ -52,8 +52,15 @@ if ($result -eq 0) {
         & cl.exe /nologo /std:c++17 /EHsc /W4 /WX /O2 /utf-8 "/I$mutationDirectory" $source "/Fo$mutationDirectory/" "/Fe$mutationExecutable"
         if ($LASTEXITCODE -ne 0) { throw "Negative-control compilation failed: $($mutation.Name)" }
         $mutationReport = Join-Path (Split-Path -Parent $absoluteReport) "$($mutation.Name).json"
-        & $mutationExecutable $mutationReport 2>&1 | Set-Content -LiteralPath ([IO.Path]::ChangeExtension($mutationReport, '.txt')) -Encoding UTF8
-        $mutationResult = $LASTEXITCODE
+        $negativeErrorPreference = $ErrorActionPreference
+        try {
+            # A rejected mutation writes its expected failing checks to stderr.
+            # Windows PowerShell otherwise promotes that evidence to a pipeline
+            # exception before the explicit exit/report checks below can run.
+            $ErrorActionPreference = 'Continue'
+            & $mutationExecutable $mutationReport 2>&1 | Set-Content -LiteralPath ([IO.Path]::ChangeExtension($mutationReport, '.txt')) -Encoding UTF8
+            $mutationResult = $LASTEXITCODE
+        } finally { $ErrorActionPreference = $negativeErrorPreference }
         $mutationEvidence = Get-Content -LiteralPath $mutationReport -Raw | ConvertFrom-Json
         if ($mutationResult -eq 0 -or $mutationEvidence.failed -lt 1) { throw "Negative control was not detected: $($mutation.Name)" }
         $negativeControls += @{

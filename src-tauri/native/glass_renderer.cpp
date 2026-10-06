@@ -295,6 +295,7 @@ struct TiezGlass {
     tiez_glass_detail::PresentationEpoch presentationEpoch{};
     tiez_glass_detail::ResizeSizeGate resizeSizeGate{};
     tiez_glass_detail::ZOrderNoopGate zOrderNoop{};
+    tiez_glass_detail::ZOrderSnapshot configuredZOrder{};
     uint64_t zOrderNoopEpoch = 0;
     UINT_PTR zOrderNoopCapture = 0;
     bool zOrderNoopRenderDeferred = false;
@@ -1119,10 +1120,17 @@ struct TiezGlass {
             next.bottom - next.top == static_cast<LONG>(captureHeight);
     }
 
-    bool position_change_can_retarget(const WINDOWPOS& position) const {
+    bool position_change_can_retarget(const WINDOWPOS& position, bool beforeChange = false) const {
         RECT actualOuter{};
+        const HWND previous = GetWindow(host, GW_HWNDPREV);
+        const tiez_glass_detail::ZOrderSnapshot currentOrder{host, previous, GetWindow(host, GW_HWNDNEXT),
+            (GetWindowLongPtrW(host, GWL_EXSTYLE) & WS_EX_TOPMOST) != 0,
+            previous && (GetWindowLongPtrW(previous, GWL_EXSTYLE) & WS_EX_TOPMOST) != 0};
+        const bool orderRetained = (position.flags & SWP_NOZORDER) ||
+            ((!beforeChange || !(position.flags & SWP_NOMOVE)) &&
+             tiez_glass_detail::translation_order_is_unchanged(position, configuredZOrder, currentOrder));
         return !qaCoincidentAuxiliary && session && validTexture && nativeStarted && active && !failed &&
-            IsWindowVisible(host) && !IsIconic(host) && (position.flags & SWP_NOZORDER) &&
+            IsWindowVisible(host) && !IsIconic(host) && orderRetained &&
             !(position.flags & (SWP_HIDEWINDOW | SWP_FRAMECHANGED)) &&
             GetWindowRect(host, &actualOuter) &&
             tiez_glass_detail::capture_viewport_can_translate(pixel_rect(hostBounds), pixel_rect(actualOuter),
@@ -1413,7 +1421,7 @@ struct TiezGlass {
         tiez_glass_detail::ZOrderSnapshot order;
         if (!noop_z_order_still_valid(token, order) ||
             !zOrderNoop.can_finish(token, order, GetTickCount64()) ||
-            (position && !tiez_glass_detail::z_order_request_is_noop(*position, order, true))) {
+            (position && !tiez_glass_detail::z_order_request_can_be_observed(*position, order, true))) {
             withdraw_noop_z_order();
             return false;
         }
@@ -1792,7 +1800,8 @@ struct TiezGlass {
     }
 
     void update_scene() {
-        auto next = ensure_scope();
+        tiez_glass_detail::ZOrderSnapshot order;
+        auto next = ensure_scope(&order);
         const bool scopeChanged = sceneConfigured && exclusions != next;
         if (capturedScene && captureExclusions != external_exclusions(next)) {
             const bool wasResizing = resizeBackground;
@@ -1803,7 +1812,10 @@ struct TiezGlass {
                 report(0);
             }
         }
-        if (sceneConfigured && exclusions == next && EqualRect(&configuredSceneCrop, &captureBounds)) return;
+        if (sceneConfigured && exclusions == next && EqualRect(&configuredSceneCrop, &captureBounds)) {
+            configuredZOrder = order;
+            return;
+        }
         if (scopeChanged) {
             // Pending frames were rendered against the previous exclusions.
             // They cannot refresh the cache under the new scope's metadata.
@@ -1823,6 +1835,7 @@ struct TiezGlass {
             size.cy != static_cast<LONG>(captureHeight)) throw hresult_error(E_ACCESSDENIED);
         exclusions = std::move(next);
         configuredSceneCrop = captureBounds;
+        configuredZOrder = order;
         sceneConfigured = true;
     }
 
@@ -1847,7 +1860,8 @@ struct TiezGlass {
     }
 
     void replace_shared_scene() {
-        auto next = ensure_scope();
+        tiez_glass_detail::ZOrderSnapshot order;
+        auto next = ensure_scope(&order);
         Thumbnail candidateThumbnail;
         com_ptr<IDCompositionVisual2> candidate;
         phase = "move.create_private_scene";
@@ -1892,6 +1906,7 @@ struct TiezGlass {
         thumbnail = candidateThumbnail.release();
         exclusions = std::move(next);
         configuredSceneCrop = captureBounds;
+        configuredZOrder = order;
         sceneConfigured = true;
         if (qaSource) {
             std::fprintf(stderr,
@@ -3285,7 +3300,7 @@ LRESULT CALLBACK host_proc(HWND window, UINT message, WPARAM wparam, LPARAM lpar
                 (SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER) ||
                 (position->flags & (SWP_HIDEWINDOW | SWP_FRAMECHANGED))) {
                 noopZOrderGeneration = renderer->begin_noop_z_order(*position);
-                if (!noopZOrderGeneration && !renderer->position_change_can_retarget(*position) &&
+                if (!noopZOrderGeneration && !renderer->position_change_can_retarget(*position, true) &&
                     !renderer->prepare_resize(*position))
                     renderer->suspend();
             }
@@ -3313,7 +3328,7 @@ LRESULT CALLBACK host_proc(HWND window, UINT message, WPARAM wparam, LPARAM lpar
                     if (!IsWindowVisible(window) || IsIconic(window) ||
                         ((!TiezGlass::EqualRectValue(client, renderer->bounds) ||
                           !TiezGlass::EqualRectValue(outer, renderer->hostBounds)) && !retained && !resizeRetained) ||
-                        (!(position->flags & SWP_NOZORDER) && !orderRetained) ||
+                        (!(position->flags & SWP_NOZORDER) && !orderRetained && !retained) ||
                         (position->flags & SWP_FRAMECHANGED)) renderer->suspend();
                 }
             }

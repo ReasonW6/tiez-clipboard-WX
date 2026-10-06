@@ -47,6 +47,24 @@ inline bool z_order_request_is_noop(const WINDOWPOS& position, const ZOrderSnaps
         position.hwndInsertAfter == order.previous && order.topmost == order.previous_topmost;
 }
 
+inline bool translation_order_is_unchanged(const WINDOWPOS& position,
+    const ZOrderSnapshot& captured, const ZOrderSnapshot& current) {
+    constexpr UINT unrelated = SWP_SHOWWINDOW | SWP_HIDEWINDOW | SWP_FRAMECHANGED |
+        SWP_NOCOPYBITS | SWP_NOREDRAW;
+    // The insertion anchor is a request, not the resulting order. Some system
+    // topmost HWNDs remain ahead of TOP requests. Compare the actual neighbors
+    // and bands again in CHANGED; a real reorder cannot use the move fast path.
+    return captured.host && position.hwnd == captured.host && !(position.flags & unrelated) &&
+        same_z_order(captured, current);
+}
+
+inline bool z_order_request_can_be_observed(const WINDOWPOS& position,
+    const ZOrderSnapshot& order, bool allow_no_z_order = false) {
+    return z_order_request_is_noop(position, order, allow_no_z_order) ||
+        (pure_z_order_request(position, order.host, allow_no_z_order) &&
+         order.topmost && position.hwndInsertAfter == HWND_TOP);
+}
+
 struct ZOrderNoopGate {
     static constexpr uint64_t lifetime_ms = 250;
     uint64_t generation = 0, started_at = 0;
@@ -58,7 +76,10 @@ struct ZOrderNoopGate {
         return waiting && now >= started_at && now - started_at < lifetime_ms;
     }
     uint64_t begin(const WINDOWPOS& position, const ZOrderSnapshot& snapshot, uint64_t now) {
-        if (waiting || !z_order_request_is_noop(position, snapshot)) return 0;
+        // TOP on an existing topmost HWND can be held below protected system
+        // windows. Freeze capture while observing it; only identical actual
+        // order after the normal procedure may complete this transaction.
+        if (waiting || !z_order_request_can_be_observed(position, snapshot)) return 0;
         ++generation;
         started_at = now;
         waiting = true;
@@ -69,7 +90,7 @@ struct ZOrderNoopGate {
     bool after_default(uint64_t token, const WINDOWPOS& position,
         const ZOrderSnapshot& snapshot, uint64_t now) {
         if (!current(token) || !within_deadline(now) || !same_z_order(order, snapshot) ||
-            !z_order_request_is_noop(position, snapshot, true)) return false;
+            !z_order_request_can_be_observed(position, snapshot, true)) return false;
         default_returned = true;
         return true;
     }

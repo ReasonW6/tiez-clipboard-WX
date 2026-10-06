@@ -81,9 +81,12 @@ mockIPC(async (command, args: any = {}) => {
       try {
         await pause(delays.nativeGlassGeometry || 0);
         if (failures.nativeGlassGeometry) throw new Error("fixture geometry error");
+        const footprint = (geometry: any) => JSON.stringify(geometry && { ...geometry,
+          controls: geometry.controls.map(({ pressure: _pressure, ...control }: any) => control) });
+        const footprintChanged = footprint(appliedGlassGeometry) !== footprint(args.geometry);
         appliedGlassGeometry = structuredClone(args.geometry);
         completedGlassGeometry++;
-        const revision = ++appliedGeometryRevision;
+        const revision = footprintChanged ? ++appliedGeometryRevision : appliedGeometryRevision;
         if (delays.nativeGlassPresentation) {
           void pause(delays.nativeGlassPresentation).then(() => submitGlassGeometry(args.geometry, revision));
         } else await submitGlassGeometry(args.geometry, revision);

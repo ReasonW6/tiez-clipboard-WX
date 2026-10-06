@@ -162,6 +162,20 @@ pub fn save_image_to_file(data_url: &str, data_dir: &std::path::Path) -> Option<
 // delete_entry_db, delete_entry, enforce_storage_limit, clear_history removed (migrated to repository)
 
 pub fn seed_defaults(conn: &Connection) -> Result<()> {
+    // Upgrade the old stock pair together so summon and sequential paste do
+    // not compete for Alt+V. Saved pairs containing custom keys stay intact.
+    let old_shortcuts: bool = conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM settings WHERE key='app.hotkey' AND value IN ('Alt+C', 'Alt+V'))
+            AND EXISTS(SELECT 1 FROM settings WHERE key='app.sequential_hotkey' AND value='Alt+V')",
+        [], |row| row.get(0),
+    )?;
+    if old_shortcuts {
+        conn.execute(
+            "UPDATE settings SET value=CASE key WHEN 'app.hotkey' THEN 'Alt+V' ELSE 'Ctrl+Alt+V' END
+                WHERE key IN ('app.hotkey', 'app.sequential_hotkey')",
+            [],
+        )?;
+    }
     // App settings
     let _ = conn.execute(
         "INSERT OR IGNORE INTO settings (key, value) VALUES ('app.theme', 'mica')",
@@ -227,7 +241,7 @@ pub fn seed_defaults(conn: &Connection) -> Result<()> {
         [],
     );
     let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('app.sequential_hotkey', 'Alt+V')",
+        "INSERT OR IGNORE INTO settings (key, value) VALUES ('app.sequential_hotkey', 'Ctrl+Alt+V')",
         [],
     );
     let _ = conn.execute(
@@ -271,7 +285,7 @@ pub fn seed_defaults(conn: &Connection) -> Result<()> {
         [],
     );
     let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('app.hotkey', 'Alt+C')",
+        "INSERT OR IGNORE INTO settings (key, value) VALUES ('app.hotkey', 'Alt+V')",
         [],
     );
     let _ = conn.execute(
@@ -359,6 +373,38 @@ mod tests {
         )
         .unwrap();
         conn
+    }
+
+    #[test]
+    fn default_shortcuts_are_distinct_and_preserve_saved_bindings() {
+        let conn = setup_test_db();
+        seed_defaults(&conn).unwrap();
+        let read = |key: &str| conn.query_row("SELECT value FROM settings WHERE key=?1", [key], |row| row.get::<_, String>(0)).unwrap();
+        assert_eq!(read("app.hotkey"), "Alt+V");
+        assert_eq!(read("app.sequential_hotkey"), "Ctrl+Alt+V");
+        conn.execute("UPDATE settings SET value='Ctrl+Shift+F12' WHERE key='app.hotkey'", []).unwrap();
+        conn.execute("UPDATE settings SET value='Alt+Shift+F11' WHERE key='app.sequential_hotkey'", []).unwrap();
+        seed_defaults(&conn).unwrap();
+        assert_eq!(read("app.hotkey"), "Ctrl+Shift+F12");
+        assert_eq!(read("app.sequential_hotkey"), "Alt+Shift+F11");
+    }
+
+    #[test]
+    fn legacy_default_shortcuts_migrate_together_without_overwriting_custom_pairs() {
+        for (main, sequential, expected) in [
+            ("Alt+C", "Alt+V", ("Alt+V", "Ctrl+Alt+V")),
+            ("Alt+V", "Alt+V", ("Alt+V", "Ctrl+Alt+V")),
+            ("Ctrl+Shift+F12", "Alt+V", ("Ctrl+Shift+F12", "Alt+V")),
+            ("Alt+C", "Alt+Shift+F11", ("Alt+C", "Alt+Shift+F11")),
+        ] {
+            let conn = setup_test_db();
+            conn.execute("INSERT INTO settings (key,value) VALUES ('app.hotkey',?1),('app.sequential_hotkey',?2)", [main,sequential]).unwrap();
+            seed_defaults(&conn).unwrap();
+            seed_defaults(&conn).unwrap();
+            let read = |key: &str| conn.query_row("SELECT value FROM settings WHERE key=?1", [key], |row| row.get::<_, String>(0)).unwrap();
+            assert_eq!(read("app.hotkey"), expected.0);
+            assert_eq!(read("app.sequential_hotkey"), expected.1);
+        }
     }
 
     #[test]

@@ -256,8 +256,11 @@ void render_fixture(Gpu& gpu,const wchar_t* geometry,const wchar_t* output,bool 
     if(!image)throw std::runtime_error("fixture bitmap output");
 }
 }
+#include "glass_runtime_regression.h"
 int wmain(int argc,wchar_t** argv) {
     try{
+        if(argc==4&&(std::wstring(argv[3])==L"--runtime"||std::wstring(argv[3])==L"--runtime-dark"))
+            return runtime_regression(argv[2],std::wstring(argv[3])==L"--runtime-dark");
         if(argc!=3&&argc!=5)throw std::runtime_error("Expected shader and report, or shader/geometry/bitmap/mode");
         Gpu gpu(argv[1],D3D_DRIVER_TYPE_HARDWARE);
         if(argc==5){render_fixture(gpu,argv[2],argv[3],std::wstring(argv[4])==L"dark");return 0;}

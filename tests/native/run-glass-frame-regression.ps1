@@ -1,4 +1,5 @@
-param([string]$ReportPath='artifacts/liquid-glass-performance-20261005/gpu-frames.json')
+param([string]$ReportPath='artifacts/liquid-glass-performance-20261005/gpu-frames.json', [switch]$Runtime,
+    [ValidateSet('light','dark')][string]$ColorMode='light')
 $ErrorActionPreference='Stop'
 $repository=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $buildDirectory=Join-Path $repository 'src-tauri/target/glass-frame-regression'
@@ -17,7 +18,12 @@ $binary=Join-Path $buildDirectory 'frames.exe'
 if($LASTEXITCODE -ne 0){throw 'Frame regression compilation failed.'}
 $absoluteReport=if([IO.Path]::IsPathRooted($ReportPath)){$ReportPath}else{Join-Path $repository $ReportPath}
 New-Item -ItemType Directory -Path (Split-Path -Parent $absoluteReport) -Force | Out-Null
-& $binary (Join-Path $repository 'src-tauri/native/glass_renderer.hlsl') $absoluteReport
+if ($Runtime) {
+    $runtimeMode=if($ColorMode -eq 'dark'){'--runtime-dark'}else{'--runtime'}
+    & $binary (Join-Path $repository 'src-tauri/native/glass_renderer.hlsl') $absoluteReport $runtimeMode
+} else {
+    & $binary (Join-Path $repository 'src-tauri/native/glass_renderer.hlsl') $absoluteReport
+}
 $resultCode=$LASTEXITCODE
 if($resultCode -eq 0){
     $result=Get-Content -LiteralPath $absoluteReport -Raw | ConvertFrom-Json
@@ -25,6 +31,9 @@ if($resultCode -eq 0){
         renderer=(Get-FileHash -LiteralPath (Join-Path $repository 'src-tauri/native/glass_renderer.cpp') -Algorithm SHA256).Hash
         shader=(Get-FileHash -LiteralPath (Join-Path $repository 'src-tauri/native/glass_renderer.hlsl') -Algorithm SHA256).Hash
         harness=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'glass_frame_regression.cpp') -Algorithm SHA256).Hash
+        runtimeHarness=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'glass_runtime_regression.h') -Algorithm SHA256).Hash
+        zOrderPolicy=(Get-FileHash -LiteralPath (Join-Path $repository 'src-tauri/native/glass_zorder_noop.h') -Algorithm SHA256).Hash
+        executable=(Get-FileHash -LiteralPath $binary -Algorithm SHA256).Hash
         runner=(Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256).Hash
     })
     [IO.File]::WriteAllText($absoluteReport,($result | ConvertTo-Json -Depth 10),[Text.UTF8Encoding]::new($false))

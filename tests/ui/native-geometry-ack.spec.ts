@@ -9,6 +9,57 @@ async function ready(page: Page) {
   await expect.poll(() => page.evaluate(() => (window as any).testApp.getGlassGeometryInFlight())).toBe(0);
 }
 
+test("press animation keeps confirmed glass while an IPC reply is delayed", async ({ page }, testInfo) => {
+  await ready(page);
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  const evidence = await page.evaluate(async () => {
+    const fixture = (window as any).testApp;
+    fixture.delays.nativeGlassGeometryReply = 600;
+    const lens = document.querySelector<HTMLElement>(".header-actions > .glass-lens")!;
+    const changes: string[] = [];
+    const observer = new MutationObserver(() => changes.push(lens.dataset.nativeGlass!));
+    observer.observe(lens, { attributes: true, attributeFilter: ["data-native-glass"] });
+    lens.parentElement!.dispatchEvent(new PointerEvent("pointerdown", { button: 0, bubbles: true }));
+    await new Promise(resolve => setTimeout(resolve, 400));
+    const status = fixture.getGlassStatus();
+    const submitted = fixture.getSubmittedGlassGeometry();
+    window.dispatchEvent(new PointerEvent("pointerup"));
+    observer.disconnect();
+    return { changes, native: lens.dataset.nativeGlass,
+      reflection: getComputedStyle(lens.querySelector(".glass-lens-reflection")!).display,
+      pressure: Math.max(...submitted.controls.map((control: any) => control.pressure)),
+      geometryRevision: status.geometryRevision };
+  });
+  await testInfo.attach("press-handoff", { body: JSON.stringify(evidence, null, 2), contentType: "application/json" });
+  expect(evidence.pressure).toBeGreaterThan(0);
+  expect(evidence.changes).not.toContain("false");
+  expect(evidence.native).toBe("true");
+  expect(evidence.reflection).toBe("none");
+});
+
+test("native slider pressure does not resize its DOM footprint", async ({ page }) => {
+  await ready(page);
+  await page.getByTitle("设置", { exact: true }).click();
+  await page.getByRole("heading", { name: "界面设置", exact: true }).click();
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.getByRole("slider", { name: "液态玻璃透明度", exact: true }).scrollIntoViewIfNeeded();
+  await page.evaluate(() => (window as any).testApp.setGlassStatus("ready"));
+  const thumb = page.locator(".glass-slider-control:has(> .glass-transparency-slider) > .glass-slider-thumb");
+  await expect(thumb.locator(".glass-lens")).toHaveAttribute("data-native-glass", "true");
+  const before = await thumb.boundingBox();
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("DOM.enable");
+  await cdp.send("CSS.enable");
+  const { root } = await cdp.send("DOM.getDocument");
+  const { nodeId } = await cdp.send("DOM.querySelector", { nodeId: root.nodeId, selector: ".glass-slider-control:has(> .glass-transparency-slider)" });
+  await cdp.send("CSS.forcePseudoState", { nodeId, forcedPseudoClasses: ["active"] });
+  await page.waitForTimeout(200);
+  expect(await thumb.boundingBox()).toEqual(before);
+  await expect(thumb.locator(".glass-lens")).toHaveAttribute("data-native-glass", "true");
+  await cdp.send("CSS.forcePseudoState", { nodeId, forcedPseudoClasses: [] });
+  await cdp.detach();
+});
+
 for (const mode of ["light", "dark"]) {
   test(`a completed IPC cannot hide ${mode} switches before their native frame submission`, async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });

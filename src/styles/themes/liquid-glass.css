@@ -151,6 +151,9 @@ body.theme-liquid-glass .tm-tag.active { background: var(--card-selected-backgro
 body.theme-liquid-glass .tm-view-toggle, body.theme-liquid-glass .tm-view-toggle .tm-icon { border-radius: 999px; }
 body.theme-liquid-glass :is(.btn-icon, .tm-button, .tm-icon) { transition: scale .16s cubic-bezier(.2,.8,.2,1.15), background-color .16s ease, box-shadow .16s ease; }
 body.theme-liquid-glass :is(.btn-icon, .tm-button, .tm-icon):active { scale: .97; transform: none; }
+/* Native pressure bends the existing surface. Scaling its DOM footprint at the
+   same time would switch between CSS and native optics throughout the press. */
+body.theme-liquid-glass.native-glass-ready :is(.btn-icon, .tm-button, .tm-icon):has(> .glass-lens) { scale: none; }
 .glass-slider-control { position: relative; width: 100%; display: flex; align-items: center; min-height: 30px; }
 .glass-slider-thumb { position: absolute; top: 4px; width: 30px; height: 22px; border-radius: 11px; pointer-events: none; isolation: isolate; --glass-shadow: 0 2px 5px rgba(23,42,65,.18); }
 body.theme-liquid-glass .glass-material-slider {
@@ -166,6 +169,7 @@ body.theme-liquid-glass.native-glass-ready .glass-slider-control:has(> .glass-sl
 }
 body.theme-liquid-glass .glass-material-slider::-webkit-slider-thumb { width: 30px; height: 22px; border: 0; background: transparent; box-shadow: none; }
 .glass-slider-control:active .glass-slider-thumb { scale: 1.08 1.02; }
+body.theme-liquid-glass.native-glass-ready .glass-slider-thumb { scale: none; }
 body.theme-liquid-glass .glass-slider-control > .glass-material-slider:focus-visible { outline: none; }
 body.theme-liquid-glass .glass-slider-control:has(> .glass-material-slider:focus-visible) .glass-slider-thumb { outline: 2px solid var(--accent-color); outline-offset: 2px; }
 @media (forced-colors: active) {

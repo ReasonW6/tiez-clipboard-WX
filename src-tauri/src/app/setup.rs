@@ -269,8 +269,8 @@ fn load_settings(repo: &impl SettingsRepository) -> StartupSettings {
             .unwrap_or(false),
         sequential_hotkey: repo
             .get("app.sequential_hotkey")
-            .unwrap_or(Some("Alt+V".to_string()))
-            .unwrap_or("Alt+V".to_string()),
+            .unwrap_or(Some("Ctrl+Alt+V".to_string()))
+            .unwrap_or("Ctrl+Alt+V".to_string()),
         rich_paste_hotkey: repo
             .get("app.rich_paste_hotkey")
             .unwrap_or(Some("Ctrl+Shift+Z".to_string()))
@@ -320,8 +320,8 @@ fn load_settings(repo: &impl SettingsRepository) -> StartupSettings {
             .and_then(|v| v.parse::<u32>().ok()),
         main_hotkey: repo
             .get("app.hotkey")
-            .unwrap_or(Some("Win+V".to_string()))
-            .unwrap_or("Win+V".to_string()),
+            .unwrap_or(Some("Alt+V".to_string()))
+            .unwrap_or("Alt+V".to_string()),
         arrow_key_selection: repo
             .get("app.arrow_key_selection")
             .unwrap_or(Some("false".to_string()))

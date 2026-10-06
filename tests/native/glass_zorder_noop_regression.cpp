@@ -83,6 +83,23 @@ void classification_cases() {
     check("a final NOZORDER request may ignore an irrelevant insertion anchor",
         z_order_request_is_noop(ignored, pinned, true));
 
+    auto drag = request(host, HWND_TOP);
+    drag.flags &= ~SWP_NOMOVE;
+    check("a drag without NOZORDER retains an independently unchanged band leader",
+        translation_order_is_unchanged(drag, pinned, pinned));
+    check("a drag which actually changes neighbors still withdraws capture",
+        !translation_order_is_unchanged(drag, pinnedMiddle, pinned));
+    check("a drag cannot retain capture across an actual band demotion",
+        !translation_order_is_unchanged(drag, pinned, normalFirst));
+    check("TOP need not raise a window over protected system topmost windows",
+        translation_order_is_unchanged(drag, pinnedMiddle, pinnedMiddle));
+    for (const UINT flag : {UINT(SWP_HIDEWINDOW), UINT(SWP_SHOWWINDOW), UINT(SWP_FRAMECHANGED), UINT(SWP_NOREDRAW)}) {
+        auto changed = drag;
+        changed.flags |= flag;
+        check("a mixed drag does not bypass visibility or rendering changes",
+            !translation_order_is_unchanged(changed, pinned, pinned));
+    }
+
     // Independent permutation oracle: enumerate small actual orders, apply
     // each accepted insertion to the full list, and require list identity.
     // Omitted windows are unrelated roots, not a privileged QA source.
@@ -177,6 +194,23 @@ void message_cases() {
     // request. Keep that counterexample explicit in the regression evidence.
     check("old unconditional z-order branch would withdraw the accepted pinned no-op",
         !(original.flags & SWP_NOZORDER) && z_order_request_is_noop(original, order));
+
+    const ZOrderSnapshot protectedOrder{window(1), window(8), window(2), true, true};
+    const auto top = request(protectedOrder.host, HWND_TOP);
+    ZOrderNoopGate protectedGate;
+    const auto observed = protectedGate.begin(top, protectedOrder, 500);
+    check("TOP below another topmost window is observed without prematurely claiming a no-op",
+        observed && !z_order_request_is_noop(top, protectedOrder) &&
+        !protectedGate.can_finish(observed, protectedOrder, 501));
+    check("an unchanged actual TOP result may finish without dropping native material",
+        protectedGate.after_default(observed, top, protectedOrder, 502) &&
+        protectedGate.can_finish(observed, protectedOrder, 503));
+    check("an actual TOP promotion still invalidates the observed transaction",
+        !protectedGate.can_finish(observed, order, 504));
+    protectedGate.cancel();
+    const auto reordered = protectedGate.begin(top, protectedOrder, 510);
+    check("a real reorder cannot authorize capture through the downstream return",
+        !protectedGate.after_default(reordered, top, order, 511));
 }
 } // namespace
 

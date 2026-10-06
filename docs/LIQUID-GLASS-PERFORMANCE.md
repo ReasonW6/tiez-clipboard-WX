@@ -57,3 +57,15 @@
 
 以上是修复前的调研记录。最终实现、源码范围、离屏测量和验证边界见
 [本轮验收记录](../artifacts/liquid-glass-performance-20261005/verification.md)。
+
+## 2026-10-05 原生移动与按压复查
+
+后续实际使用反馈仍有拖动卡顿、玻璃变为纯色和按压闪烁，说明上面的离屏结果不足以覆盖窗口消息路径。用户允许短时运行自有虚构窗口，且禁止占用鼠标键盘；新增回归只用 `SetWindowPos`、窗口消息和独立 WGC 会话进行驱动及观测。
+
+修复前，同尺寸移动只要没有 `SWP_NOZORDER` 就进入捕获撤销/重建，平均 `SetWindowPos` 耗时约 14 毫秒。微软文档说明该标志保留顺序，也说明窗口移动、尺寸和顺序属于同一个 API 的参数；缺少标志本身不能证明实际顺序已改变。[SetWindowPos](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowpos)、[WM_WINDOWPOSCHANGED](https://learn.microsoft.com/en-us/windows/win32/winmsg/wm-windowposchanged)
+
+本机探针还观察到：已有 topmost 窗口收到 `TOP` 请求后，其实际邻居和 band 可以维持不变。这里以实际结果为依据，不把这一观察解释成私有 DWM 或所有 Windows 版本的保证。实现保存已验证场景的顺序，移动后比较邻居和 band；纯顺序事务在检查期间暂停消费捕获帧，再决定保留还是撤销。真实顺序、尺寸、DPI、可见性或采样范围变化仍接受原有检查。
+
+按压另有前后端交接问题：`pressure` 没有改变玻璃几何，后端却为每次更新分配新的几何回执。帧事件早于 IPC 返回时，前端会短暂撤销所有确认。现在同一 viewport、控件顺序、矩形、材质和 track 复用回执；只变 pressure 时仍正常渲染。位置、尺寸、材质、track 或绘制顺序改变必须取得新确认。原生可用时也不同时缩放对应 DOM 玻璃轮廓。
+
+修复前失败记录、修复后浅色/深色实际呈现、动态背景更新、隐藏恢复及测量范围见 [原生复查验收](../artifacts/liquid-glass-runtime-20261005/verification.md)。离屏像素、窗口消息处理耗时和实际呈现分别记录，不能互相替代，也不能把测试循环等待当作实际应用 FPS。

@@ -46,8 +46,8 @@ export const useAppState = (): AppState => {
 
   const [installedApps, setInstalledApps] = useState<InstalledAppOption[]>([]);
   const [dataPath, setDataPath] = useState<string>("");
-  const [hotkey, setHotkey] = useState<string>("Alt+C");
-  const [sequentialHotkey, setSequentialHotkey] = useState<string>("Alt+V");
+  const [hotkey, setHotkey] = useState<string>("Alt+V");
+  const [sequentialHotkey, setSequentialHotkey] = useState<string>("Ctrl+Alt+V");
   const [richPasteHotkey, setRichPasteHotkey] = useState<string>("Alt+Shift+V");
   const [searchHotkey, setSearchHotkey] = useState<string>("Alt+F");
   const [quickPasteModifier, setQuickPasteModifier] =
