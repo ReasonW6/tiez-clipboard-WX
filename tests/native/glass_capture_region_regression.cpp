@@ -55,8 +55,24 @@ int main(){
     PixelRect result{}, small{-8,-5,42,35},client{0,0,30,20};
     require(capture_region(client,small,113,result)&&same_rect(result,small),"small authorized sources bound the entire reserve");
     const PixelRect offscreen{-40,0,20,20};
-    require(capture_region(offscreen,small,113,result)&&same_rect(result,offscreen),
-        "a partly unavailable client keeps exact legacy extent, never a fake reserve");
+    require(capture_region(offscreen,small,113,result)&&same_rect(result,small),
+        "a partly unavailable client keeps a reserve inside the available source");
+    {
+        // Dragging across a screen edge or edge docking must not resize the source.
+        const PixelRect desktop{0,0,1920,1080};
+        PixelRect inside{}, crossing{}, docked{};
+        require(capture_region({600,300,1172,896},desktop,113,inside)&&
+            capture_region({-400,300,172,896},desktop,113,crossing)&&
+            capture_region({-569,300,3,896},desktop,113,docked),"edge placements select a reserve");
+        require(inside.right-inside.left==crossing.right-crossing.left&&
+            inside.bottom-inside.top==crossing.bottom-crossing.top&&
+            inside.right-inside.left==docked.right-docked.left,"the reserve extent is stable across the screen edge");
+        require(contains_rect(desktop,crossing)&&contains_rect(crossing,{0,300,172,896})&&
+            contains_rect(desktop,docked)&&contains_rect(docked,{0,300,3,896}),
+            "only on-desktop pixels are claimed and the visible part is covered");
+        require(capture_region({-900,300,-328,896},desktop,113,result)&&same_rect(result,{-900,300,-328,896}),
+            "a client entirely off the desktop keeps the exact legacy extent");
+    }
     require(capture_region(client,small,0,result)&&same_rect(result,client),"explicit zero reserve keeps exact viewport");
     for(PixelRect bad:std::array<PixelRect,4>{{{1,0,1,5},{0,1,5,1},{0,0,8193,20},{INT32_MIN,0,INT32_MAX,20}}}){
         result={1,2,3,4};require(!capture_region(bad,available,113,result)&&same_rect(result,{1,2,3,4}),
@@ -89,7 +105,9 @@ int main(){
         }
     }
     require(capture_supports(small,client,small,128),"a real source boundary needs no invented outside halo");
-    require(!capture_supports(small,offscreen,small,0),"off-source pixels cannot be promoted into reserve coverage");
+    require(capture_supports(small,offscreen,small,0),"the visible part of a partly unavailable client is supported");
+    require(!capture_supports({0,-5,42,35},offscreen,small,0),"a visible part outside the source cannot be promoted into coverage");
+    require(!capture_supports(small,{-60,0,-20,20},small,0),"a client with no visible part is never supported");
     for(float invalid:{-1.f,std::numeric_limits<float>::infinity(),std::numeric_limits<float>::quiet_NaN()})
         require(!capture_supports(available,centered,available,invalid),"invalid filter support rejects session reuse");
     for(PixelRect corner:std::array<PixelRect,2>{{{INT32_MIN,INT32_MIN,INT32_MIN+160,INT32_MIN+120},

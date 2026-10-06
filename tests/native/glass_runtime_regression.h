@@ -215,6 +215,30 @@ int runtime_regression(const wchar_t* reportPath,bool dark=false) {
             passed=passed&&reorderWithdrawals==0&&reorderSameCapture&&raw->reportedState==1&&!raw->failed;
         }
         {
+            // USER32's sizing loop: HWND_TOP without SWP_NOZORDER on every step,
+            // growing past the capture reserve and back. The background stays
+            // mounted throughout and the capture is rebuilt once at the end.
+            const size_t sizingStart=events.states.size();
+            RECT sizingOuter{};GetWindowRect(host.value,&sizingOuter);
+            runtimeMaxDispatchMs=0;double sizingLongest=0;const unsigned sizingSteps=40;
+            SendMessageW(host.value,WM_ENTERSIZEMOVE,0,0);
+            for(unsigned step=0;step<sizingSteps;++step){
+                const int grow=int(step<sizingSteps/2?step:sizingSteps-step)*6;
+                const auto before=std::chrono::steady_clock::now();
+                SetWindowPos(host.value,nullptr,sizingOuter.left,sizingOuter.top,w+grow,h+grow,SWP_NOACTIVATE);
+                pump_runtime(8,monitor.get());
+                sizingLongest=std::max(sizingLongest,std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-before).count());
+            }
+            SetWindowPos(host.value,nullptr,sizingOuter.left,sizingOuter.top,w,h,SWP_NOACTIVATE);
+            SendMessageW(host.value,WM_EXITSIZEMOVE,0,0);
+            const auto sizingBegan=std::chrono::steady_clock::now();
+            while(raw->reportedState!=1&&!raw->failed&&std::chrono::steady_clock::now()-sizingBegan<std::chrono::seconds(4))pump_runtime(10);
+            pump_runtime(200,monitor.get());
+            const auto sizingWithdrawals=std::count(events.states.begin()+sizingStart,events.states.end(),0);
+            file<<",{\"name\":\"interactive_resize\",\"steps\":"<<sizingSteps<<",\"maxDispatchMs\":"<<runtimeMaxDispatchMs<<",\"maxIterationMs\":"<<sizingLongest<<",\"withdrawals\":"<<sizingWithdrawals<<",\"finalState\":"<<raw->reportedState<<'}';
+            passed=passed&&sizingWithdrawals==0&&raw->reportedState==1&&!raw->failed;
+        }
+        {
             // A drag can start before a rebuilt capture accepted its first frame.
             ShowWindow(host.value,SW_HIDE);pump_runtime(25);ShowWindow(host.value,SW_SHOWNOACTIVATE);
             const auto startupBegan=std::chrono::steady_clock::now();

@@ -359,8 +359,14 @@ int main() {
         "integer CSS viewport rounding remains valid at 175 percent DPI");
     require(optics_ready(true, 1001, 751, 501, 376, 2.0f),
         "half CSS pixel rounding remains valid at 200 percent DPI");
-    require(!optics_ready(true, 1001, 751, 800, 600, 1.25f),
-        "one physical pixel of stale geometry does not pass the gate");
+    require(optics_ready(true, 1000, 751, 572, 430, 1.75f),
+        "upward CSS viewport rounding remains valid at 175 percent DPI");
+    require(optics_ready(true, 572, 596, 382, 398, 1.5f),
+        "WebView2's observed upward rounding at 150 percent DPI is accepted");
+    require(!optics_ready(true, 1001, 751, 799, 599, 1.25f),
+        "a viewport more than one CSS pixel stale does not pass the gate");
+    require(!optics_ready(true, 1000, 750, 801, 600, 1.25f),
+        "a whole CSS pixel of difference is stale geometry");
     require(!refresh_background_surface(true, false, true),
         "dynamic captures, material and control updates do not remount the foreground");
     require(refresh_background_surface(true, true, true),

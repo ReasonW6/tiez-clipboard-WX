@@ -200,10 +200,11 @@ inline bool optics_ready(bool captured, uint32_t width, uint32_t height,
     float viewport_width, float viewport_height, float scale) {
     return captured && std::isfinite(scale) && scale > 0.0f &&
         std::isfinite(viewport_width) && std::isfinite(viewport_height) &&
-        // window.innerWidth/Height round to whole CSS pixels, including at
-        // fractional and high DPI. Compare in that same coordinate space.
-        std::abs(viewport_width - static_cast<float>(width) / scale) <= 0.51f &&
-        std::abs(viewport_height - static_cast<float>(height) / scale) <= 0.51f;
+        // window.innerWidth/Height are whole CSS pixels. WebView2 rounds them
+        // up as well as down (572 px at 150% reports 382), so any value within
+        // one CSS pixel of the physical extent belongs to this surface.
+        std::abs(viewport_width - static_cast<float>(width) / scale) < 1.0f &&
+        std::abs(viewport_height - static_cast<float>(height) / scale) < 1.0f;
 }
 inline bool background_only(bool forced, bool captured, uint32_t width, uint32_t height,
     float viewport_width, float viewport_height, float scale) {

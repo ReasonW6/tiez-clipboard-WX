@@ -29,6 +29,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <cstdarg>
 #include <cmath>
 #include <cstddef>
 #include <cstdio>
@@ -141,6 +142,22 @@ void CALLBACK scene_event(HWINEVENTHOOK hook, DWORD, HWND, LONG object, LONG, DW
         if (found != hookDispatch.end()) dispatch = found->second.lock();
     }
     queue(dispatch, false);
+}
+
+// Opt-in diagnostics for real sessions: TIEZ_GLASS_TRACE names a file that
+// receives the renderer's lifecycle trace. Only geometry, flags and states
+// of this process's own windows are written; never pixels or window text.
+bool production_trace() noexcept {
+    static const bool enabled = [] {
+        wchar_t path[MAX_PATH]{};
+        const DWORD length = GetEnvironmentVariableW(L"TIEZ_GLASS_TRACE", path, MAX_PATH);
+        if (!length || length >= MAX_PATH) return false;
+        // Unlike _wfreopen_s, _wfreopen opens a sharable file, so the trace can
+        // be read while the app is still running.
+#pragma warning(suppress: 4996)
+        return _wfreopen(path, L"a", stderr) != nullptr;
+    }();
+    return enabled;
 }
 
 bool own_window(HWND window) noexcept {
@@ -259,6 +276,7 @@ void register_helper_class() {
 
 struct TiezGlass {
     HWND host = nullptr, qaSource = nullptr, helper = nullptr, cover = nullptr;
+    const bool tracing;
     const DWORD thread = GetCurrentThreadId();
     const UINT_PTR identity = nextGeneration.fetch_add(1);
     void* callbackContext = nullptr;
@@ -279,7 +297,11 @@ struct TiezGlass {
     uint64_t cropRevision = 0, acceptedCropRevision = 0, rejectedEarlyFrames = 0;
     int64_t earliestRetargetFrame = 0;
     bool validTexture = false, nativeStarted = false, baseDirty = true, solidOnlyOutput = false;
-    bool awaitingMoveCapture = false;
+    bool awaitingMoveCapture = false, startingCapture = false;
+    // Between WM_ENTERSIZEMOVE and WM_EXITSIZEMOVE. A drag-resize sends a new
+    // size every few milliseconds; rebuilding the capture or output for each
+    // one could never finish, so that work waits for the loop to end.
+    bool interactiveSizing = false;
     bool retargetFlushPending = false;
     bool initialAlphaPending = false;
     uint64_t initialCaptureAt = 0;
@@ -381,7 +403,8 @@ struct TiezGlass {
     };
 
     TiezGlass(HWND window, HWND fixture, void* user, TiezGlassStateCallback stateCallback)
-        : host(window), qaSource(fixture), callbackContext(user), callback(stateCallback) {
+        : host(window), qaSource(fixture), tracing(fixture != nullptr || production_trace()),
+          callbackContext(user), callback(stateCallback) {
         if (fixture) {
             wchar_t mode[32]{};
             const DWORD length = GetEnvironmentVariableW(L"TIEZ_MATERIAL_QA_AUXILIARY", mode, static_cast<DWORD>(std::size(mode)));
@@ -413,9 +436,21 @@ struct TiezGlass {
         else { baseDirty = true; frameDeferred = true; }
     }
 
+    void trace_line(const char* format, ...) const noexcept {
+        if (!tracing) return;
+        std::fprintf(stderr, "[native-glass-trace] renderer=%llu tick_ms=%llu ",
+            static_cast<unsigned long long>(identity), static_cast<unsigned long long>(GetTickCount64()));
+        va_list arguments;
+        va_start(arguments, format);
+        std::vfprintf(stderr, format, arguments);
+        va_end(arguments);
+        std::fputc('\n', stderr);
+        std::fflush(stderr);
+    }
+
     void trace_output(const char* event, IDXGISwapChain1* previous = nullptr,
         IDCompositionSurface* previousBackground = nullptr) const noexcept {
-        if (!qaSource) return;
+        if (!tracing) return;
         FILETIME utc{};
         GetSystemTimePreciseAsFileTime(&utc);
         ULARGE_INTEGER stamp{};
@@ -438,7 +473,7 @@ struct TiezGlass {
     }
 
     void trace_host_layout(const char* event) const noexcept {
-        if (!qaSource || !own_window(host)) return;
+        if (!tracing || !own_window(host)) return;
         RECT outer{}, client{}, mask{}, expected{};
         POINT origin{};
         GetWindowRect(host, &outer);
@@ -462,7 +497,7 @@ struct TiezGlass {
     }
 
     void diagnose(HRESULT error) const noexcept {
-        if (!qaSource) return;
+        if (!tracing) return;
         RECT outer{}, client{};
         POINT origin{};
         const BOOL outerOk = GetWindowRect(host, &outer);
@@ -517,7 +552,7 @@ struct TiezGlass {
         if (secondRead != ERROR && firstType == OBJ_REGION && secondType == OBJ_REGION) {
             std::swap(result.value, retry.value);
             ++regionQueryRetries;
-            if (qaSource && (regionQueryRetries & (regionQueryRetries - 1)) == 0) {
+            if (tracing && (regionQueryRetries & (regionQueryRetries - 1)) == 0) {
                 std::fprintf(stderr,
                     "[native-glass-region-query] renderer=%llu recovered_reads=%llu first_error=%lu second_read=%d\n",
                     static_cast<unsigned long long>(identity), static_cast<unsigned long long>(regionQueryRetries),
@@ -535,7 +570,7 @@ struct TiezGlass {
         // checks distinguish the observed missing mask from a bad query handle.
         const bool missing = firstType == OBJ_REGION && secondType == OBJ_REGION &&
             secondRead == ERROR && sourceBox == ERROR && sourceError == ERROR_SUCCESS;
-        if (qaSource) {
+        if (tracing) {
             std::fprintf(stderr,
                 "[native-glass-region-query] renderer=%llu first_read=%d first_error=%lu first_type=%lu "
                 "second_read=%d second_error=%lu second_type=%lu source_box=%d source_error=%lu "
@@ -651,7 +686,7 @@ struct TiezGlass {
         // Unwind the current frame before stopping capture. No old texture or
         // auxiliary window survives into the queued, fully checked rebuild.
         suspend();
-        if (qaSource) {
+        if (tracing) {
             std::fprintf(stderr, "[native-glass-region-recovery] renderer=%llu queued=1 size=[%u,%u]\n",
                 static_cast<unsigned long long>(identity), width, height);
             std::fflush(stderr);
@@ -667,7 +702,7 @@ struct TiezGlass {
         suspend();
         const bool resume = active && hasState && own_window(host) &&
             IsWindowVisible(host) && !IsIconic(host);
-        if (qaSource) {
+        if (tracing) {
             std::fprintf(stderr,
                 "[native-glass-host-transition] renderer=%llu reason=%s suspended=1 requeue=%d\n",
                 static_cast<unsigned long long>(identity), reason, resume);
@@ -711,7 +746,7 @@ struct TiezGlass {
         if (failed || tearingDown) return;
         scopeRecoveryPending = true;
         suspend();
-        if (qaSource) {
+        if (tracing) {
             std::fprintf(stderr, "[native-glass-scope-recovery] renderer=%llu reason=%s suspended=1 sampled_output=0\n",
                 static_cast<unsigned long long>(identity), reason);
             std::fflush(stderr);
@@ -780,7 +815,7 @@ struct TiezGlass {
                 restored = SetWindowRgn(host, nullptr, TRUE) != 0;
             }
             if (restored) hostRegionInstalled = false;
-            else if (qaSource) {
+            else if (tracing) {
                 std::fprintf(stderr, "[native-glass-region-restore] renderer=%llu failed=1\n",
                     static_cast<unsigned long long>(identity));
                 std::fflush(stderr);
@@ -1064,7 +1099,7 @@ struct TiezGlass {
     }
 
     void diagnose_scope(const Scope& scope) const noexcept {
-        if (!qaSource) return;
+        if (!tracing) return;
         std::fprintf(stderr,
             "[native-glass-scope] reached_host=%d reached_cover=%d reached_helper=%d reached_source=%d "
             "correct_order=%d host_above_cover=%d cover_above_helper=%d blocked=%d "
@@ -1167,8 +1202,24 @@ struct TiezGlass {
             throw HostStateChanged{"display_layout"};
         if (!EqualRect(&client, &bounds) || !EqualRect(&outer, &hostBounds)) {
             if (can_translate(client, outer, dpi, desktop)) throw HostTranslationPending{};
+            // A drag continues while the capture is being built. Restarting on
+            // every step meant it never finished; finish at the configured crop
+            // and translate once the session exists.
+            if (startingCapture && same_placement_shape(client, outer)) {
+                reconcileDeferred = true;
+                return;
+            }
             throw HostStateChanged{"geometry"};
         }
+    }
+
+    bool same_placement_shape(const RECT& client, const RECT& outer) const noexcept {
+        return client.right - client.left == bounds.right - bounds.left &&
+            client.bottom - client.top == bounds.bottom - bounds.top &&
+            outer.right - outer.left == hostBounds.right - hostBounds.left &&
+            outer.bottom - outer.top == hostBounds.bottom - hostBounds.top &&
+            client.left - outer.left == bounds.left - hostBounds.left &&
+            client.top - outer.top == bounds.top - hostBounds.top;
     }
 
     bool auxiliary_outside_desktop() const {
@@ -1346,8 +1397,13 @@ struct TiezGlass {
             if (!cached.reachedHost || !cached.reachedSource || cached.blocked) return false;
         }
         Region current;
-        const bool correctRegion = query_host_region(current) && expectedHostRegion.value &&
-            EqualRgn(current.value, expectedHostRegion.value);
+        const bool present = query_host_region(current);
+        // During a drag-resize GetWindowRgn/GetWindowRgnBox can briefly report
+        // no region between our own per-step installs (observed: error 6 while
+        // layout traces before and after show the exact mask). A mismatching
+        // mask still fails; a transient read gap must not withdraw the resize.
+        const bool correctRegion = expectedHostRegion.value && (present ?
+            EqualRgn(current.value, expectedHostRegion.value) != FALSE : interactiveSizing && hostRegionInstalled);
         return capturedScene && (validTexture || resizeLease.active) &&
             own_window(host) && GetWindowThreadProcessId(host, nullptr) == thread &&
             GetAncestor(host, GA_ROOT) == host && !GetWindow(host, GW_OWNER) &&
@@ -1543,12 +1599,13 @@ struct TiezGlass {
         const RECT client = client_bounds();
         RECT outer{};
         require_bool(GetWindowRect(host, &outer));
+        extend_sizing_lease();
         if (!reusable_background(pending_resize_scope(client))) {
             cancel_presentation();
             return;
         }
-        if (viewportResizePending && (!(position.flags & SWP_NOZORDER) ||
-            (position.flags & (SWP_HIDEWINDOW | SWP_FRAMECHANGED)) || !capture_supports_client(client))) {
+        if (viewportResizePending && ((position.flags & (SWP_HIDEWINDOW | SWP_FRAMECHANGED)) ||
+            !capture_supports_client(client))) {
             suspend();
             return;
         }
@@ -1737,9 +1794,20 @@ struct TiezGlass {
         require_bool(SetTimer(host, resizeWatchdogId, remaining, nullptr) != 0);
     }
 
+    // The retained background stays valid while the user is still sizing; the
+    // lease only bounds a resize whose final WM_SIZE never arrives.
+    void extend_sizing_lease() noexcept {
+        if (interactiveSizing && resizeLease.active) resizeLease.started_at = GetTickCount64();
+    }
+
     void expire_resize_background() {
         if (synchronizing) return;
         if (!resizeBackground) { KillTimer(host, resizeWatchdogId); return; }
+        if (interactiveSizing) {
+            extend_sizing_lease();
+            arm_resize_watchdog();
+            return;
+        }
         const uint64_t now = GetTickCount64();
         if (resizeLease.active && now >= resizeLease.started_at &&
             now - resizeLease.started_at < tiez_glass_detail::resize_cache_lifetime_ms) return;
@@ -1763,15 +1831,17 @@ struct TiezGlass {
     }
 
     bool prepare_resize(const WINDOWPOS& position) {
+        // USER32's sizing loop requests HWND_TOP on every step, like its move
+        // loop. A real reorder still fails the reusable_background scope check.
         if (synchronizing || tearingDown || failed || qaCoincidentAuxiliary ||
-            (position.flags & SWP_NOSIZE) || !(position.flags & SWP_NOZORDER) ||
-            (position.flags & (SWP_HIDEWINDOW | SWP_FRAMECHANGED))) return false;
+            (position.flags & SWP_NOSIZE) || (position.flags & (SWP_HIDEWINDOW | SWP_FRAMECHANGED))) return false;
         RECT currentOuter{};
         require_bool(GetWindowRect(host, &currentOuter));
         // The active HWND may already be B while the retained capture is A.
         // Compare this request with the actual window, so B -> A is a resize.
         if (position.cx == currentOuter.right - currentOuter.left &&
             position.cy == currentOuter.bottom - currentOuter.top) return false;
+        extend_sizing_lease();
         // A static WGC source need not produce new frames while idle. Its last
         // verified raw image can begin a new lease, but repeated resize messages
         // cannot renew it. Only frame_arrived replaces the source during resize.
@@ -1788,24 +1858,29 @@ struct TiezGlass {
         SynchronizationScope synchronization(*this);
         const auto scope = ensure_scope();
         if (!reusable_background(scope)) return false;
-        // Remove the old controls before Windows changes the physical size.
-        // A cached final OpticsPS image must never survive into a resize.
-        trace_output("resize.prepare");
-        render(true);
-        if (foregroundSwapMounted) {
-            // A nonblocking Present can be busy. Hide its old controls with a
-            // current background tree transaction before the HWND size changes.
-            pendingPresent = {};
-            KillTimer(host, presentRetryTimerId);
-            if (!publish_background_surface(presentationEpoch.value, "resize.backpressure", false)) return false;
-            resizeBackground = true;
-            resizeLease.begin(GetTickCount64());
-            arm_resize_watchdog();
-            report(3);
+        // Every step of a drag-resize arrives here. Once the previous step left
+        // only the background mounted there are no old controls to remove, so
+        // skip re-presenting it and the vsync wait.
+        if (!resizeBackground || foregroundSwapMounted) {
+            // Remove the old controls before Windows changes the physical size.
+            // A cached final OpticsPS image must never survive into a resize.
+            trace_output("resize.prepare");
+            render(true);
+            if (foregroundSwapMounted) {
+                // A nonblocking Present can be busy. Hide its old controls with a
+                // current background tree transaction before the HWND size changes.
+                pendingPresent = {};
+                KillTimer(host, presentRetryTimerId);
+                if (!publish_background_surface(presentationEpoch.value, "resize.backpressure", false)) return false;
+                resizeBackground = true;
+                resizeLease.begin(GetTickCount64());
+                arm_resize_watchdog();
+                report(3);
+            }
+            check_hresult(DwmFlush());
+            if (!reusable_background(ensure_scope())) return false;
+            trace_output("resize.background_presented");
         }
-        check_hresult(DwmFlush());
-        if (!reusable_background(ensure_scope())) return false;
-        trace_output("resize.background_presented");
         const RECT currentClient = client_bounds();
         resizeSizeGate.begin();
         viewportResizePending = retain_resize_capture(position, currentClient, currentOuter);
@@ -1840,17 +1915,14 @@ struct TiezGlass {
     void update_scene() {
         auto next = scene_scope();
         const bool scopeChanged = sceneConfigured && exclusions != next;
-        if (capturedScene && captureExclusions != external_exclusions(next)) {
-            const bool wasResizing = resizeBackground;
+        // Stale exclusions end resize reuse (reusable_background compares them)
+        // but not the presented image, nor reprojection while moving: the next
+        // accepted frame refreshes the capture under the new scope.
+        if (capturedScene && resizeBackground && captureExclusions != external_exclusions(next))
             forget_resize_background();
-            if (wasResizing) {
-                validTexture = false;
-                detach_output();
-                report(0);
-            }
-        }
         if (sceneConfigured && exclusions == next && EqualRect(&configuredSceneCrop, &captureBounds)) return;
         if (scopeChanged) {
+            trace_line("scene.scope_changed exclusions=%zu->%zu", exclusions.size(), next.size());
             // Pending frames were rendered against the previous exclusions.
             // They cannot refresh the cache under the new scope's metadata.
             // Keep presenting the last image until the new scope's first frame
@@ -1942,7 +2014,7 @@ struct TiezGlass {
         exclusions = std::move(next);
         configuredSceneCrop = captureBounds;
         sceneConfigured = true;
-        if (qaSource) {
+        if (tracing) {
             std::fprintf(stderr,
                 "[native-glass-scene-replace] revision=%llu previous=%p current=%p helper=%p pool=%p session=%p\n",
                 static_cast<unsigned long long>(cropRevision), static_cast<void*>(previous.value),
@@ -1987,7 +2059,7 @@ struct TiezGlass {
             retargetFlushPending = previousFlushPending;
             throw;
         }
-        if (qaSource) {
+        if (tracing) {
             std::fprintf(stderr,
                 "[native-glass-retarget] revision=%llu earliest_100ns=%lld discarded=%u "
                 "crop=[%ld,%ld,%ld,%ld] retained_capture=1\n",
@@ -1995,7 +2067,12 @@ struct TiezGlass {
                 bounds.left, bounds.top, bounds.right, bounds.bottom);
             std::fflush(stderr);
         }
-        if (reusable_background(ensure_scope()) && copy_captured_viewport()) {
+        const bool reusable = reprojectable_capture();
+        const bool reprojected = reusable && copy_captured_viewport();
+        trace_line("move.translate client=[%ld,%ld,%ld,%ld] crop_revision=%llu valid=%d reusable=%d reprojected=%d",
+            bounds.left, bounds.top, bounds.right, bounds.bottom, static_cast<unsigned long long>(cropRevision),
+            validTexture, reusable, reprojected);
+        if (reprojected) {
             // A static reserve can already cover the new viewport. Reprojection
             // does not stamp an old source as a newly arrived capture.
             awaitingMoveCapture = false;
@@ -2015,6 +2092,14 @@ struct TiezGlass {
         queue(dispatch, true);
     }
 
+    bool reprojectable_capture() const {
+        // A move only needs the same physical source space. Window order, the
+        // monitor under the host and its mask do not change captured pixels.
+        return capturedScene && validTexture && lastCapture.context.dpi == configuredDpi &&
+            lastCapture.context.display_epoch == displayEpoch &&
+            tiez_glass_detail::same_rect(lastCapture.context.desktop, pixel_rect(virtualDesktopBounds));
+    }
+
     void make_texture(com_ptr<ID3D11Texture2D>& texture, com_ptr<ID3D11ShaderResourceView>& view,
         com_ptr<ID3D11RenderTargetView>* target, bool mipChain = false,
         DXGI_FORMAT format = DXGI_FORMAT_B8G8R8A8_UNORM, UINT textureWidth = 0, UINT textureHeight = 0) {
@@ -2032,19 +2117,55 @@ struct TiezGlass {
         if (target) check_hresult(device->CreateRenderTargetView(texture.get(), nullptr, target->put()));
     }
 
+    // Off-desktop pixels are never visible. Seed them from the trusted
+    // source's final 1x1 mip, as the retained resize composite does, so blur
+    // and refraction at the screen edge sample a plausible neighbor.
+    void fill_scene_estimate() {
+        D3D11_TEXTURE2D_DESC captured{};
+        capturedScene->GetDesc(&captured);
+        D3D11_SHADER_RESOURCE_VIEW_DESC averageDescriptor{};
+        averageDescriptor.Format = captured.Format;
+        averageDescriptor.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+        averageDescriptor.Texture2D.MostDetailedMip = captured.MipLevels - 1;
+        averageDescriptor.Texture2D.MipLevels = 1;
+        com_ptr<ID3D11ShaderResourceView> averageView;
+        check_hresult(device->CreateShaderResourceView(capturedScene.get(), &averageDescriptor, averageView.put()));
+        com_ptr<ID3D11RenderTargetView> target;
+        check_hresult(device->CreateRenderTargetView(scene.get(), nullptr, target.put()));
+        ShaderState average{};
+        average.size[0] = static_cast<float>(width);
+        average.size[1] = static_cast<float>(height);
+        std::copy_n(parameters.tint_rgba, 3, average.tint);
+        average.options[2] = 1.0f;
+        bind_pass_pipeline();
+        draw_pass(averageView.get(), target.get(), blur.get(), average);
+    }
+
     bool copy_captured_viewport() {
         if (!capturedScene) return false;
         tiez_glass_detail::ResizeCopy copy{};
-        if (!tiez_glass_detail::capture_viewport_copy(lastCapture.crop, pixel_rect(bounds), copy)) return false;
+        const auto viewport = pixel_rect(bounds);
+        const bool complete = tiez_glass_detail::capture_viewport_copy(lastCapture.crop, viewport, copy);
+        if (!complete) {
+            // Only the part beyond the desktop may be estimated. A visible part
+            // outside the capture still waits for a frame from the new crop.
+            tiez_glass_detail::PixelRect visible{};
+            if (!tiez_glass_detail::intersect_rect(viewport, pixel_rect(available_capture_bounds()), visible) ||
+                !tiez_glass_detail::contains_rect(lastCapture.crop, visible)) return false;
+            copy = tiez_glass_detail::resize_intersection(lastCapture.crop, viewport);
+            if (!copy.width || !copy.height) return false;
+        }
         D3D11_TEXTURE2D_DESC description{};
         capturedScene->GetDesc(&description);
         if (description.Width != static_cast<UINT>(lastCapture.crop.right - lastCapture.crop.left) ||
             description.Height != static_cast<UINT>(lastCapture.crop.bottom - lastCapture.crop.top) ||
             description.Format != DXGI_FORMAT_B8G8R8A8_UNORM || description.ArraySize != 1 ||
             description.SampleDesc.Count != 1 || description.SampleDesc.Quality != 0) throw hresult_error(E_BOUNDS);
+        if (!complete) fill_scene_estimate();
         const D3D11_BOX source{copy.source_x, copy.source_y, 0,
             copy.source_x + copy.width, copy.source_y + copy.height, 1};
-        context->CopySubresourceRegion(scene.get(), 0, 0, 0, 0, capturedScene.get(), 0, &source);
+        context->CopySubresourceRegion(scene.get(), 0, copy.destination_x, copy.destination_y, 0,
+            capturedScene.get(), 0, &source);
         context->GenerateMips(sceneView.get());
         baseDirty = true;
         return true;
@@ -2221,12 +2342,12 @@ struct TiezGlass {
 
     bool publish_background_surface(uint64_t outputEpoch, const char* reason, bool showForeground = true) {
         LARGE_INTEGER started{}, prepared{}, completed{}, frequency{};
-        if (qaSource) QueryPerformanceCounter(&started);
+        if (tracing) QueryPerformanceCounter(&started);
         BackgroundOutput candidate;
         if (!prepare_background_surface(outputEpoch, candidate)) return false;
-        if (qaSource) QueryPerformanceCounter(&prepared);
+        if (tracing) QueryPerformanceCounter(&prepared);
         if (!mount_output(outputEpoch, candidate, showForeground)) return false;
-        if (qaSource && QueryPerformanceCounter(&completed) && QueryPerformanceFrequency(&frequency) &&
+        if (tracing && QueryPerformanceCounter(&completed) && QueryPerformanceFrequency(&frequency) &&
             frequency.QuadPart > 0 && started.QuadPart > 0 && prepared.QuadPart >= started.QuadPart &&
             completed.QuadPart >= prepared.QuadPart) {
             // Fixture-only CPU wall time. Copy queues GPU work; neither these
@@ -2399,6 +2520,11 @@ struct TiezGlass {
             return;
         }
         if (!resizeBackground) report(0);
+        struct Starting {
+            bool& flag;
+            explicit Starting(bool& value) : flag(value) { flag = true; }
+            ~Starting() { flag = false; }
+        } starting{startingCapture};
         phase = "capture.client_dimensions";
         bounds = client_bounds();
         if (bounds.right <= bounds.left || bounds.bottom <= bounds.top ||
@@ -2625,6 +2751,7 @@ struct TiezGlass {
 
     void suspend() noexcept {
         if (tearingDown) return;
+        trace_line("suspend phase=%s synchronizing=%d valid=%d", phase, synchronizing, validTexture);
         cancel_noop_z_order();
         if (synchronizing) {
             forget_resize_background();
@@ -2715,11 +2842,14 @@ struct TiezGlass {
             const UINT currentDpi = GetDpiForWindow(host);
             const bool moved = !EqualRect(&currentClient, &bounds) || !EqualRect(&currentOuter, &hostBounds);
             if (viewportResizePending) {
+                if (interactiveSizing) return;
                 finish_retained_viewport(currentClient, currentOuter);
             } else if (moved && can_translate(currentClient, currentOuter, currentDpi, read_virtual_desktop())) {
                 translate_capture(currentClient, currentOuter);
             } else if (!session || moved ||
                 (currentDpi && currentDpi != configuredDpi)) {
+                // Keep showing the retained background until the drag-resize ends.
+                if (interactiveSizing && resizeBackground && !session) return;
                 // Only prepare_resize may retain a verified raw background.
                 stop_capture(resizeBackground);
                 begin_capture();
@@ -3099,17 +3229,22 @@ struct TiezGlass {
                 }
                 return;
             }
+            // Sample only the client's captured part: near a screen edge the rest
+            // of the client lies outside the source.
+            RECT sampled{};
+            if (!IntersectRect(&sampled, &bounds, &captureBounds)) throw hresult_error(E_BOUNDS);
+            const LONG sampledWidth = sampled.right - sampled.left, sampledHeight = sampled.bottom - sampled.top;
             const std::array<POINT, 5> locations{{
-                {static_cast<LONG>(width / 2), static_cast<LONG>(height / 2)},
-                {static_cast<LONG>(width / 4), static_cast<LONG>(height / 4)},
-                {static_cast<LONG>(width * 3 / 4), static_cast<LONG>(height / 4)},
-                {static_cast<LONG>(width / 4), static_cast<LONG>(height * 3 / 4)},
-                {static_cast<LONG>(width * 3 / 4), static_cast<LONG>(height * 3 / 4)}
+                {sampled.left + sampledWidth / 2, sampled.top + sampledHeight / 2},
+                {sampled.left + sampledWidth / 4, sampled.top + sampledHeight / 4},
+                {sampled.left + sampledWidth * 3 / 4, sampled.top + sampledHeight / 4},
+                {sampled.left + sampledWidth / 4, sampled.top + sampledHeight * 3 / 4},
+                {sampled.left + sampledWidth * 3 / 4, sampled.top + sampledHeight * 3 / 4}
             }};
             for (UINT index = 0; index < locations.size(); ++index) {
                 const auto point = locations[index];
-                const UINT x = static_cast<UINT>(point.x + bounds.left - captureBounds.left);
-                const UINT y = static_cast<UINT>(point.y + bounds.top - captureBounds.top);
+                const UINT x = static_cast<UINT>(point.x - captureBounds.left);
+                const UINT y = static_cast<UINT>(point.y - captureBounds.top);
                 const D3D11_BOX source{x, y, 0, x + 1, y + 1, 1};
                 context->CopySubresourceRegion(initialAlpha.get(), 0, index, 0, 0, texture.get(), 0, &source);
             }
@@ -3129,8 +3264,11 @@ struct TiezGlass {
         context->CopySubresourceRegion(captureTexture.get(), 0, 0, 0, 0, texture.get(), 0, nullptr);
         context->GenerateMips(captureView.get());
         if (!accept_copied_capture(frameEpoch, GetTickCount64())) return;
+        trace_line("frame.accept capture_revision=%llu crop_revision=%llu rejected_early=%llu",
+            static_cast<unsigned long long>(captureRevision), static_cast<unsigned long long>(cropRevision),
+            static_cast<unsigned long long>(rejectedEarlyFrames));
         render();
-        if (qaSource && cropRevision != acceptedCropRevision) {
+        if (tracing && cropRevision != acceptedCropRevision) {
             std::fprintf(stderr,
                 "[native-glass-retarget-frame] revision=%llu rendered_100ns=%lld earliest_100ns=%lld rejected_early=%llu\n",
                 static_cast<unsigned long long>(cropRevision), static_cast<long long>(newestTime),
@@ -3281,7 +3419,7 @@ LRESULT CALLBACK host_proc(HWND window, UINT message, WPARAM wparam, LPARAM lpar
     const uint64_t resizeMessageGeneration = message == WM_SIZE && renderer->resizeSizeGate.position_known
         ? renderer->resizeSizeGate.generation : 0;
     try {
-        if (renderer->qaSource) {
+        if (renderer->tracing) {
             if (message == WM_NCCALCSIZE) renderer->trace_host_layout("message.nccalcsize");
             else if (message == WM_NCPAINT) renderer->trace_host_layout("message.ncpaint");
             else if (message == WM_ERASEBKGND) renderer->trace_host_layout("message.erase_background");
@@ -3321,6 +3459,11 @@ LRESULT CALLBACK host_proc(HWND window, UINT message, WPARAM wparam, LPARAM lpar
             }
             return 0;
         }
+        if (message == WM_ENTERSIZEMOVE) renderer->interactiveSizing = true;
+        if (message == WM_EXITSIZEMOVE) {
+            renderer->interactiveSizing = false;
+            renderer->request_reconcile();
+        }
         if (message == WM_DISPLAYCHANGE) renderer->display_changed();
         if (message == WM_DPICHANGED || (message == WM_SHOWWINDOW && !wparam)) {
             renderer->forget_resize_background();
@@ -3337,9 +3480,12 @@ LRESULT CALLBACK host_proc(HWND window, UINT message, WPARAM wparam, LPARAM lpar
                 (SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER) ||
                 (position->flags & (SWP_HIDEWINDOW | SWP_FRAMECHANGED))) {
                 noopZOrderGeneration = renderer->begin_noop_z_order(*position);
-                if (!noopZOrderGeneration && !renderer->position_change_can_retarget(*position) &&
-                    !renderer->prepare_resize(*position))
-                    renderer->suspend();
+                const bool retarget = !noopZOrderGeneration && renderer->position_change_can_retarget(*position);
+                const bool resize = !noopZOrderGeneration && !retarget && renderer->prepare_resize(*position);
+                renderer->trace_line("windowpos.changing flags=0x%04X after=%p pos=[%d,%d,%d,%d] noop=%d retarget=%d resize=%d",
+                    position->flags, static_cast<void*>(position->hwndInsertAfter), position->x, position->y,
+                    position->cx, position->cy, noopZOrderGeneration != 0, retarget, resize);
+                if (!noopZOrderGeneration && !retarget && !resize) renderer->suspend();
             }
         }
         if (message == WM_WINDOWPOSCHANGED || message == WM_DPICHANGED || message == WM_SHOWWINDOW) {
@@ -3358,15 +3504,18 @@ LRESULT CALLBACK host_proc(HWND window, UINT message, WPARAM wparam, LPARAM lpar
                     const bool resizeRetained = renderer->viewportResizePending &&
                         renderer->resizeSizeGate.position_known &&
                         TiezGlass::EqualRectValue(client, renderer->pendingViewportClient) &&
-                        TiezGlass::EqualRectValue(outer, renderer->pendingViewportOuter) &&
-                        (position->flags & SWP_NOZORDER);
+                        TiezGlass::EqualRectValue(outer, renderer->pendingViewportOuter);
                     const bool retained = renderer->position_change_can_retarget(*position) &&
                         renderer->can_translate(client, outer, GetDpiForWindow(window), renderer->read_virtual_desktop());
-                    if (!IsWindowVisible(window) || IsIconic(window) ||
-                        ((!TiezGlass::EqualRectValue(client, renderer->bounds) ||
-                          !TiezGlass::EqualRectValue(outer, renderer->hostBounds)) && !retained && !resizeRetained) ||
-                        (!(position->flags & SWP_NOZORDER) && !orderRetained && !retained) ||
-                        ((position->flags & SWP_FRAMECHANGED) && !retained)) renderer->suspend();
+                    const bool moved = !TiezGlass::EqualRectValue(client, renderer->bounds) ||
+                        !TiezGlass::EqualRectValue(outer, renderer->hostBounds);
+                    const bool withdraw = !IsWindowVisible(window) || IsIconic(window) ||
+                        (moved && !retained && !resizeRetained) ||
+                        (!(position->flags & SWP_NOZORDER) && !orderRetained && !retained && !resizeRetained) ||
+                        ((position->flags & SWP_FRAMECHANGED) && !retained);
+                    renderer->trace_line("windowpos.changed flags=0x%04X client=[%ld,%ld,%ld,%ld] moved=%d retained=%d resize_retained=%d withdraw=%d",
+                        position->flags, client.left, client.top, client.right, client.bottom, moved, retained, resizeRetained, withdraw);
+                    if (withdraw) renderer->suspend();
                 }
             }
             renderer->request_reconcile();
