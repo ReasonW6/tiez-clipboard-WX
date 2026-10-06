@@ -112,6 +112,12 @@ pub fn init(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(target_os = "windows")]
     setup_taskbar_listener(app);
 
+    // 12. Let the hidden WebView stop painting and release memory
+    #[cfg(target_os = "windows")]
+    if let Some(window) = app.get_webview_window("main") {
+        crate::infrastructure::webview_activity::install(&window);
+    }
+
     Ok(())
 }
 
