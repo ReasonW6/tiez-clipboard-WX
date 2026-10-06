@@ -28,7 +28,7 @@ $result = $LASTEXITCODE
 $negativeControls = @()
 if ($result -eq 0) {
     $policyText = Get-Content -LiteralPath $policy -Raw
-    $functionPattern = '(?s)inline bool z_order_request_is_noop\(.*?\r?\n}\r?\n(?=\r?\ninline bool translation_order_is_unchanged)'
+    $functionPattern = '(?s)inline bool z_order_request_is_noop\(.*?\r?\n}\r?\n(?=\r?\ninline bool z_order_request_can_be_observed)'
     if ([regex]::Matches($policyText, $functionPattern).Count -ne 1) { throw 'Expected one production classifier.' }
     $earlyCheck = 'return current(token) && default_returned && within_deadline(now) && same_z_order(order, snapshot);'
     if (-not $policyText.Contains($earlyCheck)) { throw 'Expected the production default-procedure completion gate.' }

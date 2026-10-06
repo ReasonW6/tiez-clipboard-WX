@@ -47,17 +47,6 @@ inline bool z_order_request_is_noop(const WINDOWPOS& position, const ZOrderSnaps
         position.hwndInsertAfter == order.previous && order.topmost == order.previous_topmost;
 }
 
-inline bool translation_order_is_unchanged(const WINDOWPOS& position,
-    const ZOrderSnapshot& captured, const ZOrderSnapshot& current) {
-    constexpr UINT unrelated = SWP_SHOWWINDOW | SWP_HIDEWINDOW | SWP_FRAMECHANGED |
-        SWP_NOCOPYBITS | SWP_NOREDRAW;
-    // The insertion anchor is a request, not the resulting order. Some system
-    // topmost HWNDs remain ahead of TOP requests. Compare the actual neighbors
-    // and bands again in CHANGED; a real reorder cannot use the move fast path.
-    return captured.host && position.hwnd == captured.host && !(position.flags & unrelated) &&
-        same_z_order(captured, current);
-}
-
 inline bool z_order_request_can_be_observed(const WINDOWPOS& position,
     const ZOrderSnapshot& order, bool allow_no_z_order = false) {
     return z_order_request_is_noop(position, order, allow_no_z_order) ||

@@ -18,6 +18,7 @@ struct RuntimeCapture {
     GraphicsCaptureSession session{nullptr};
     com_ptr<ID3D11Texture2D> staging;
     unsigned frames=0,blankReadyFrames=0,opaqueFailures=0;
+    bool evaluate=true;
     double lastRange=0;
     UINT width=0,height=0;
     std::vector<uint8_t> pixels;
@@ -46,14 +47,14 @@ struct RuntimeCapture {
         D3D11_MAPPED_SUBRESOURCE mapped{};check_hresult(renderer.context->Map(staging.get(),0,D3D11_MAP_READ,0,&mapped));
         for(UINT row=0;row<height;++row)std::copy_n(static_cast<const uint8_t*>(mapped.pData)+size_t(row)*mapped.RowPitch,size_t(width)*4,pixels.data()+size_t(row)*width*4);
         renderer.context->Unmap(staging.get(),0);
-        if(renderer.reportedState!=1)return;
+        if(renderer.reportedState!=1||!evaluate)return;
         ++frames;unsigned minimum=255,maximum=0,alpha=255;
         for(UINT y=height*3/5;y<height*9/10;y+=8)for(UINT x=24;x+24<width;x+=4){
             const auto* pixel=pixels.data()+(size_t(y)*width+x)*4;
             minimum=std::min(minimum,unsigned(pixel[2]));maximum=std::max(maximum,unsigned(pixel[2]));alpha=std::min(alpha,unsigned(pixel[3]));
         }
         lastRange=double(maximum-minimum);
-        if(lastRange<8)++blankReadyFrames;
+        if(lastRange<8){++blankReadyFrames;std::fprintf(stderr,"[runtime-blank-ready-frame] tick_ms=%llu range=%.0f\n",GetTickCount64(),lastRange);}
         if(alpha!=255)++opaqueFailures;
     }
     void save(const std::filesystem::path& path){
@@ -124,14 +125,13 @@ int runtime_regression(const wchar_t* reportPath,bool dark=false) {
         for(unsigned scenario=0;scenario<3;++scenario){
             const bool noZOrder=scenario==0;
             WINDOWPOS diagnostic{host.value,HWND_TOP,x+200,y+160,w,h,UINT(SWP_NOSIZE|SWP_NOACTIVATE|(noZOrder?SWP_NOZORDER:0))};
-            const auto& order=raw->configuredZOrder;
-            std::fprintf(stderr,"[runtime-move-order] nozorder=%d eligible=%d host=%p configured=[%p,%p,%d,%d] actual=[%p,%p,%d,%d]\n",
-                noZOrder,raw->position_change_can_retarget(diagnostic),static_cast<void*>(host.value),static_cast<void*>(order.previous),static_cast<void*>(order.next),order.topmost,order.previous_topmost,
+            std::fprintf(stderr,"[runtime-move-order] nozorder=%d eligible=%d host=%p actual=[%p,%p,%d,%d]\n",
+                noZOrder,raw->position_change_can_retarget(diagnostic),static_cast<void*>(host.value),
                 static_cast<void*>(GetWindow(host.value,GW_HWNDPREV)),static_cast<void*>(GetWindow(host.value,GW_HWNDNEXT)),
                 (GetWindowLongPtrW(host.value,GWL_EXSTYLE)&WS_EX_TOPMOST)!=0,
                 GetWindow(host.value,GW_HWNDPREV)&&(GetWindowLongPtrW(GetWindow(host.value,GW_HWNDPREV),GWL_EXSTYLE)&WS_EX_TOPMOST)!=0);
             const size_t start=events.states.size();double longest=0,total=0,longestIteration=0,totalIteration=0;const unsigned moves=36;
-            const uint64_t capture=raw->dispatch->generation,revision=raw->cropRevision;
+            const uint64_t capture=raw->dispatch?raw->dispatch->generation:0,revision=raw->cropRevision;
             runtimeMaxDispatchMs=runtimeMaxReadbackMs=runtimeMaxSleepMs=0;
             SendMessageW(host.value,WM_ENTERSIZEMOVE,0,0);
             for(unsigned step=0;step<moves;++step){
@@ -174,6 +174,73 @@ int runtime_regression(const wchar_t* reportPath,bool dark=false) {
         const auto backgroundWithdrawals=std::count(events.states.begin()+backgroundStart,events.states.end(),0);
         file<<",{\"name\":\"dynamic_background\",\"updates\":24,\"presentedColorChange\":"<<change<<",\"withdrawals\":"<<backgroundWithdrawals<<",\"finalState\":"<<raw->reportedState<<'}';
         passed=passed&&change>4&&backgroundWithdrawals==0&&raw->reportedState==1&&!raw->failed;
+        {
+            // Tao's set_focusable rewrites WS_EX_NOACTIVATE and refreshes the frame
+            // without moving, sizing or reordering the HWND.
+            const size_t refreshStart=events.states.size();const auto refreshCapture=raw->dispatch?raw->dispatch->generation:0;
+            runtimeMaxDispatchMs=0;
+            for(unsigned step=0;step<8;++step){
+                SetWindowLongPtrW(host.value,GWL_EXSTYLE,GetWindowLongPtrW(host.value,GWL_EXSTYLE)^WS_EX_NOACTIVATE);
+                SetWindowPos(host.value,nullptr,0,0,0,0,SWP_NOZORDER|SWP_NOMOVE|SWP_NOSIZE|SWP_FRAMECHANGED|SWP_NOACTIVATE);
+                pump_runtime(35,monitor.get());
+            }
+            pump_runtime(300,monitor.get());
+            const auto refreshWithdrawals=std::count(events.states.begin()+refreshStart,events.states.end(),0);
+            const bool refreshSameCapture=raw->dispatch&&raw->dispatch->generation==refreshCapture;
+            file<<",{\"name\":\"frame_refresh\",\"updates\":8,\"maxDispatchMs\":"<<runtimeMaxDispatchMs<<",\"sameCapture\":"<<(refreshSameCapture?"true":"false")<<",\"withdrawals\":"<<refreshWithdrawals<<",\"finalState\":"<<raw->reportedState<<'}';
+            passed=passed&&refreshWithdrawals==0&&refreshSameCapture&&raw->reportedState==1&&!raw->failed;
+        }
+        {
+            // Another window rises above the host, then a modal drag moves the
+            // host with USER32's implicit HWND_TOP request (no SWP_NOZORDER).
+            HWND peer=CreateWindowExW(WS_EX_TOOLWINDOW|WS_EX_NOACTIVATE|WS_EX_TOPMOST,sourceClass.lpszClassName,
+                L"TieZ synthetic peer",WS_POPUP,x+40,y+40,96,96,nullptr,nullptr,sourceClass.hInstance,nullptr);
+            const size_t reorderStart=events.states.size();const auto reorderCapture=raw->dispatch?raw->dispatch->generation:0;
+            runtimeMaxDispatchMs=0;
+            ShowWindow(peer,SW_SHOWNOACTIVATE);SetWindowPos(peer,HWND_TOPMOST,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE);
+            pump_runtime(300,monitor.get());
+            double reorderLongestIteration=0;const unsigned reorderMoves=36;
+            SendMessageW(host.value,WM_ENTERSIZEMOVE,0,0);
+            for(unsigned step=0;step<reorderMoves;++step){
+                const auto before=std::chrono::steady_clock::now();
+                SetWindowPos(host.value,nullptr,x+200+int(step%12)*8,y+160,0,0,SWP_NOSIZE|SWP_NOACTIVATE);
+                pump_runtime(8,monitor.get());
+                reorderLongestIteration=std::max(reorderLongestIteration,std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-before).count());
+            }
+            SendMessageW(host.value,WM_EXITSIZEMOVE,0,0);pump_runtime(300,monitor.get());
+            DestroyWindow(peer);pump_runtime(300,monitor.get());
+            const auto reorderWithdrawals=std::count(events.states.begin()+reorderStart,events.states.end(),0);
+            const bool reorderSameCapture=raw->dispatch&&raw->dispatch->generation==reorderCapture;
+            file<<",{\"name\":\"reorder_drag\",\"moves\":"<<reorderMoves<<",\"maxDispatchMs\":"<<runtimeMaxDispatchMs<<",\"maxIterationMs\":"<<reorderLongestIteration<<",\"sameCapture\":"<<(reorderSameCapture?"true":"false")<<",\"withdrawals\":"<<reorderWithdrawals<<",\"finalState\":"<<raw->reportedState<<'}';
+            passed=passed&&reorderWithdrawals==0&&reorderSameCapture&&raw->reportedState==1&&!raw->failed;
+        }
+        {
+            // A drag can start before a rebuilt capture accepted its first frame.
+            ShowWindow(host.value,SW_HIDE);pump_runtime(25);ShowWindow(host.value,SW_SHOWNOACTIVATE);
+            const auto startupBegan=std::chrono::steady_clock::now();
+            while(!raw->session&&!raw->failed&&std::chrono::steady_clock::now()-startupBegan<std::chrono::seconds(1))pump_runtime(1);
+            const bool startupStartedBeforeReady=raw->session&&!raw->validTexture;
+            monitor->evaluate=false;
+            const auto startupCapture=raw->dispatch?raw->dispatch->generation:0;
+            runtimeMaxDispatchMs=0;double startupLongestIteration=0;const unsigned startupMoves=20;
+            SendMessageW(host.value,WM_ENTERSIZEMOVE,0,0);
+            for(unsigned step=0;step<startupMoves;++step){
+                const auto before=std::chrono::steady_clock::now();
+                SetWindowPos(host.value,nullptr,x+200+int(step%12)*8,y+160,0,0,SWP_NOSIZE|SWP_NOACTIVATE);
+                pump_runtime(8,monitor.get());
+                startupLongestIteration=std::max(startupLongestIteration,std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-before).count());
+            }
+            SendMessageW(host.value,WM_EXITSIZEMOVE,0,0);
+            // State 1 means submitted, not displayed. Keep draining the monitor so
+            // its pool stays current, but judge pixels only after the startup frame
+            // has had time to reach the screen.
+            while(raw->reportedState!=1&&!raw->failed&&std::chrono::steady_clock::now()-startupBegan<std::chrono::seconds(4))pump_runtime(10,monitor.get());
+            pump_runtime(100,monitor.get());monitor->evaluate=true;
+            pump_runtime(100,monitor.get());
+            const bool startupSameCapture=raw->dispatch&&raw->dispatch->generation==startupCapture;
+            file<<",{\"name\":\"move_during_startup\",\"moves\":"<<startupMoves<<",\"startedBeforeReady\":"<<(startupStartedBeforeReady?"true":"false")<<",\"maxDispatchMs\":"<<runtimeMaxDispatchMs<<",\"maxIterationMs\":"<<startupLongestIteration<<",\"sameCapture\":"<<(startupSameCapture?"true":"false")<<",\"finalState\":"<<raw->reportedState<<'}';
+            passed=passed&&startupSameCapture&&raw->reportedState==1&&!raw->failed;
+        }
         const unsigned firstFrames=monitor->frames,blanks=monitor->blankReadyFrames,alpha=monitor->opaqueFailures;
         passed=passed&&firstFrames>0&&blanks==0&&alpha==0;
         file<<"],\"presentedFrames\":"<<firstFrames<<",\"blankReadyFrames\":"<<blanks<<",\"nonopaqueInteriorFrames\":"<<alpha<<",\"recoveries\":[";

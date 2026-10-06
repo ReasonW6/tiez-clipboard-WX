@@ -69,3 +69,32 @@
 按压另有前后端交接问题：`pressure` 没有改变玻璃几何，后端却为每次更新分配新的几何回执。帧事件早于 IPC 返回时，前端会短暂撤销所有确认。现在同一 viewport、控件顺序、矩形、材质和 track 复用回执；只变 pressure 时仍正常渲染。位置、尺寸、材质、track 或绘制顺序改变必须取得新确认。原生可用时也不同时缩放对应 DOM 玻璃轮廓。
 
 修复前失败记录、修复后浅色/深色实际呈现、动态背景更新、隐藏恢复及测量范围见 [原生复查验收](../artifacts/liquid-glass-runtime-20261005/verification.md)。离屏像素、窗口消息处理耗时和实际呈现分别记录，不能互相替代，也不能把测试循环等待当作实际应用 FPS。
+
+## 2026-10-06 拖动、激活与边框刷新复查
+
+10-05 的修复之后，实际使用中仍有拖动卡顿、拖动时材质消失、点击控件时整窗闪烁。原 runtime 回归里的宿主一开始就在同层最前，所以“移动同时改变实际 z 序”这条路径一直没有被覆盖到。
+
+根因有三处，都会让 `suspend()` 拆掉整个捕获，前端随即退回 CSS 材质：
+
+1. 模态拖动循环每一步都请求 `HWND_TOP`，且不带 `SWP_NOZORDER`。参照 ReactOS 的 `DefWndDoSizeMove` 实现；这里没有在 Windows 上逐条观测消息，以下回归使用相同的参数。只要实际邻居变化（宿主被提到同层最前，或别的置顶窗口出现、消失），`position_change_can_retarget` 就会拒绝平移。重建期间 `validTexture=false`，此后每一步又被拒绝一次，所以整个拖动过程中首帧都不可能被接受。
+2. Tao 的 `set_focusable` 用 `SWP_FRAMECHANGED|SWP_NOMOVE|SWP_NOSIZE|SWP_NOZORDER` 刷新边框，渲染器对 `SWP_FRAMECHANGED` 一律撤回。触发点包括输入框的 `activate_window_focus`，以及固定状态下点击窗口外部。
+3. `update_scene` 一旦发现排除列表变化，就撤回输出并报告 `0`。
+
+现在的策略：移动、实际重排和不改变 DPI 与边框样式的刷新，都保留当前捕获和已挂载图像；排除列表原地更新，用 `earliestRetargetFrame` 加 DwmFlush 栅栏拒绝旧场景的帧。辅助窗口被置顶层级变化挤到宿主上方时，把它们移回宿主正下方，不再重建。首帧到达之前的移动只平移 crop，并丢弃旧 crop 的首帧 alpha 读回。同一拖动步骤产生的多个 `WM_WINDOWPOSCHANGED` 只排队一次 reconcile。尺寸、DPI、边框样式和可见性的变化仍然走原有的撤回与重建路径。
+
+`tests/native/glass_runtime_regression.h` 新增 `frame_refresh`、`reorder_drag`、`move_during_startup` 三个场景。同一台机器（144 DPI）上的结果如下，时间为单条窗口消息的最长处理耗时：
+
+| 场景 | 修复前 | 修复后（连续 3 次） |
+| --- | --- | --- |
+| frame_refresh | 撤回 1 次，捕获重建，69 ms | 不撤回，同一捕获，1.3–1.7 ms |
+| reorder_drag | 撤回 3 次，捕获重建，92 ms | 不撤回，同一捕获，3.0–5.2 ms |
+| move_during_startup | 捕获重建，81 ms | 同一捕获，2.9–5.8 ms |
+
+原有的“不带 NOZORDER 的移动”在修复前也会间歇性撤回（一次 123 ms），修复后不再出现。
+
+仍需注意的边界：
+
+- 跨捕获预留区时，`replace_shared_scene` 仍在 UI 线程同步执行 `WaitForCommitCompletion`，单次 8–20 ms。微软文档没有说明它能否跨线程调用，因此没有移到工作线程。
+- 调整大小的模态循环同样不带 `SWP_NOZORDER`，`prepare_resize` 对这类请求仍会撤回。本轮没有修改调整大小的路径。
+- QA fixture 模式下，第三方的全屏置顶窗口（本机观测到 `Qt51513QWindowToolSaveBits`）会触发 `fixture_obstructed`，这属于测试环境因素。生产模式不做遮挡检查。
+- 回归测试由 `SetWindowPos` 驱动，没有使用真实鼠标拖动，也不代表实际显示帧率。
