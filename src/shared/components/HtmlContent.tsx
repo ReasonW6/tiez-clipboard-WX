@@ -1,4 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import DOMPurify, { type Config } from "dompurify";
+import contentStyles from "../../styles/components/rich-text-content.css?raw";
 import { toTauriLocalImageSrc } from "../lib/localImageSrc";
 import {
   isHtmlishTagText,
@@ -43,6 +45,13 @@ const resolveImgSource = (el: Element): string | null => {
     return lazySrc || srcsetPrimary || lazySrcsetPrimary || null;
   }
   return src;
+};
+
+const PURIFY_CONFIG: Config = {
+  // Keep leading <style> blocks (Excel/WPS formatting) instead of dropping them with <head>.
+  FORCE_BODY: true,
+  // Forms and <base> could submit to or retarget the app window.
+  FORBID_TAGS: ["form", "input", "button", "textarea", "select", "base"]
 };
 
 const sanitizeHTML = (html: string, preview?: boolean) => {
@@ -128,41 +137,26 @@ const sanitizeHTML = (html: string, preview?: boolean) => {
   });
   stripLeadingPreviewNoise(doc.body);
 
-  const all = doc.querySelectorAll("*");
-  all.forEach(el => {
-    // Basic sanitization of on* attributes and javascript: links
-    [...el.attributes].forEach(attr => {
-      const name = attr.name.toLowerCase();
-      const value = attr.value.toLowerCase();
-      if (name.startsWith("on")) {
-        el.removeAttribute(attr.name);
+  // Handle local file images (including encoded file:// paths)
+  doc.querySelectorAll("img").forEach(el => {
+    const resolvedSrc = resolveImgSource(el);
+    if (resolvedSrc) {
+      if (el.getAttribute("src") !== resolvedSrc) {
+        el.setAttribute("src", resolvedSrc);
       }
-      if ((name === "href" || name === "src") && value.startsWith("javascript:")) {
-        el.removeAttribute(attr.name);
+      const normalizedSrc = resolvedSrc.startsWith("//") ? `https:${resolvedSrc}` : resolvedSrc;
+      if (normalizedSrc !== resolvedSrc) {
+        el.setAttribute("src", normalizedSrc);
       }
-    });
 
-    // Handle local file images (including encoded file:// paths)
-    if (el.tagName.toLowerCase() === 'img') {
-      const resolvedSrc = resolveImgSource(el);
-      if (resolvedSrc) {
-        if (el.getAttribute("src") !== resolvedSrc) {
-          el.setAttribute("src", resolvedSrc);
-        }
-        const normalizedSrc = resolvedSrc.startsWith("//") ? `https:${resolvedSrc}` : resolvedSrc;
-        if (normalizedSrc !== resolvedSrc) {
-          el.setAttribute("src", normalizedSrc);
-        }
-
-        const mappedSrc = toTauriLocalImageSrc(normalizedSrc);
-        if (mappedSrc) {
-          el.setAttribute('src', mappedSrc);
-          (el as HTMLElement).style.maxWidth = '100%';
-          (el as HTMLElement).style.height = 'auto';
-        } else if (/^https?:\/\//i.test(normalizedSrc)) {
-          // Some hosts reject unknown referrers; no-referrer is more broadly accepted.
-          el.setAttribute("referrerpolicy", "no-referrer");
-        }
+      const mappedSrc = toTauriLocalImageSrc(normalizedSrc);
+      if (mappedSrc) {
+        el.setAttribute('src', mappedSrc);
+        (el as HTMLElement).style.maxWidth = '100%';
+        (el as HTMLElement).style.height = 'auto';
+      } else if (/^https?:\/\//i.test(normalizedSrc)) {
+        // Some hosts reject unknown referrers; no-referrer is more broadly accepted.
+        el.setAttribute("referrerpolicy", "no-referrer");
       }
     }
   });
@@ -178,7 +172,46 @@ const sanitizeHTML = (html: string, preview?: boolean) => {
   const hasRenderableText = textContent.length > 0 && textContent !== TRUNCATION_MARKER;
   const hasRenderableElement = !!bodyClone.querySelector("p, div, span, img, table, ul, ol, li, h1, h2, h3, h4, h5, h6, blockquote, pre");
 
-  return { html: doc.body.innerHTML, hasRenderable: hasRenderableText || hasRenderableElement };
+  return {
+    html: DOMPurify.sanitize(doc.body.innerHTML, PURIFY_CONFIG),
+    hasRenderable: hasRenderableText || hasRenderableElement
+  };
+};
+
+const blockLinkNavigation = (event: Event) => {
+  // Links in copied HTML must never navigate the app window.
+  if ((event.target as Element | null)?.closest?.("a")) {
+    event.preventDefault();
+  }
+};
+
+// Copied <style> blocks and :host rules stay inside the shadow root; the caller's
+// container clips positioned content (see `contain: paint` below).
+export const renderRichContent = (
+  host: HTMLElement,
+  htmlContent: string,
+  options: { preview?: boolean; fallbackText?: string } = {}
+) => {
+  const { html: cleanHTML, hasRenderable } = sanitizeHTML(htmlContent, options.preview);
+  let root = host.shadowRoot;
+  if (!root) {
+    root = host.attachShadow({ mode: "open" });
+    root.addEventListener("click", blockLinkNavigation);
+    root.addEventListener("auxclick", blockLinkNavigation);
+  }
+  const styleEl = document.createElement("style");
+  styleEl.textContent = contentStyles;
+  const body = document.createElement("div");
+  body.className = "rich-text-body";
+  if (host.closest(".compact-preview-root")) {
+    body.classList.add("in-compact-preview");
+  }
+  if (!hasRenderable && options.fallbackText) {
+    body.textContent = options.fallbackText;
+  } else {
+    body.innerHTML = cleanHTML;
+  }
+  root.replaceChildren(styleEl, body);
 };
 
 type HtmlContentProps = {
@@ -191,6 +224,7 @@ type HtmlContentProps = {
 
 const HtmlContent = ({ htmlContent, fallbackText, className, style, preview }: HtmlContentProps) => {
   const contentRef = useRef<HTMLDivElement | null>(null);
+  const hostRef = useRef<HTMLDivElement | null>(null);
   const processedRef = useRef<{ htmlContent: string; preview?: boolean; fallbackText?: string } | null>(null);
   const [isVisible, setIsVisible] = useState(!!preview);
   const previewPlaceholderMinHeight = (() => {
@@ -219,18 +253,13 @@ const HtmlContent = ({ htmlContent, fallbackText, className, style, preview }: H
   }, [preview]);
 
   useLayoutEffect(() => {
-    if (!isVisible || !contentRef.current) return;
+    if (!isVisible || !hostRef.current) return;
     const prev = processedRef.current;
     if (prev && prev.htmlContent === htmlContent && prev.preview === preview && prev.fallbackText === fallbackText) {
       return;
     }
     processedRef.current = { htmlContent, preview, fallbackText };
-    const { html: cleanHTML, hasRenderable } = sanitizeHTML(htmlContent, preview);
-    if (!hasRenderable && fallbackText) {
-      contentRef.current.textContent = fallbackText;
-    } else {
-      contentRef.current.innerHTML = cleanHTML;
-    }
+    renderRichContent(hostRef.current, htmlContent, { preview, fallbackText });
   }, [htmlContent, fallbackText, isVisible, preview]);
 
   return (
@@ -239,9 +268,13 @@ const HtmlContent = ({ htmlContent, fallbackText, className, style, preview }: H
       className={className}
       style={{
         minHeight: isVisible ? undefined : (preview ? previewPlaceholderMinHeight : '100px'),
-        ...style
+        ...style,
+        // Keeps fixed/absolute content from the clipboard inside this box.
+        contain: "paint"
       }}
-    />
+    >
+      <div ref={hostRef} />
+    </div>
   );
 };
 

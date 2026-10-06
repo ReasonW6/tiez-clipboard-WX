@@ -23,9 +23,7 @@ fn main() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_sql::Builder::default().build())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, shortcut, event| {
@@ -41,7 +39,6 @@ fn main() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             Some(vec!["--minimized"]),
         ))
-        .plugin(tauri_plugin_http::init())
         .setup(|app| {
             setup::init(app)?;
             Ok(())
@@ -95,10 +92,7 @@ fn main() {
             app::commands::set_edge_docking,
             app::commands::set_follow_mouse,
             app::commands::get_data_path,
-            app::commands::open_folder,
             app::commands::open_data_folder,
-            app::commands::open_file_with_default_app,
-            app::commands::open_file_location,
             app::commands::set_data_path,
             app::commands::toggle_autostart,
             app::commands::is_autostart_enabled,
@@ -107,8 +101,6 @@ fn main() {
             app::commands::set_win_clipboard_disabled,
             app::commands::trigger_registry_win_v_optimization,
             app::commands::is_registry_win_v_optimized,
-            app::commands::restart_explorer,
-            app::commands::restart_as_admin,
             app::commands::check_is_admin,
             app::commands::quit,
             app::commands::relaunch,
@@ -130,7 +122,6 @@ fn main() {
             app::commands::save_emoji_favorite_data_url,
             app::commands::save_emoji_favorite_url,
             app::commands::get_file_size,
-            app::commands::save_file_copy,
             services::clipboard_ops::paste_text_directly,
             services::clipboard_ops::paste_content_transiently,
             services::paste_queue::get_paste_queue,

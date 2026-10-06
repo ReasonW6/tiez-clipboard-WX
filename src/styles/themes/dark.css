@@ -6,8 +6,8 @@
   background: rgba(255, 255, 255, 0.05);
 }
 
-.dark-mode .rich-text-preview td{
-  border-color: rgba(255, 255, 255, 0.1);
+.dark-mode .rich-text-preview{
+  --rich-text-cell-border: rgba(255, 255, 255, 0.1);
 }
 
 /* Specific theme overrides */

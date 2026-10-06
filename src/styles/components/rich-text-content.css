@@ -1,0 +1,67 @@
+/* Scoped inside HtmlContent's shadow root; copied <style> blocks cannot reach the app. */
+.rich-text-body table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 4px 0;
+  font-size: 10px;
+}
+
+.rich-text-body td,
+.rich-text-body th {
+  border: 1px solid var(--rich-text-cell-border, var(--border-dark));
+  padding: 2px 4px;
+  background-color: var(--bg-element);
+  opacity: 0.9;
+}
+
+.rich-text-body * {
+  max-width: 100% !important;
+}
+
+.rich-text-body img {
+  max-height: 80px;
+  object-fit: contain;
+  border-radius: 0;
+}
+
+.rich-text-body p {
+  margin: 0;
+  padding: 0;
+}
+
+/* Ensure headings aren't too huge in preview */
+.rich-text-body h1,
+.rich-text-body h2,
+.rich-text-body h3,
+.rich-text-body h4 {
+  font-size: 1em;
+  font-weight: bold;
+  margin: 2px 0;
+}
+
+.rich-text-body ul,
+.rich-text-body ol {
+  padding-left: 16px;
+  margin: 0;
+}
+
+.rich-text-body a {
+  color: var(--accent-color);
+  text-decoration: underline;
+}
+
+/* Compact preview window: avoid extra blank lines at top/bottom */
+.rich-text-body.in-compact-preview > :first-child {
+  margin-top: 0 !important;
+}
+
+.rich-text-body.in-compact-preview > :last-child {
+  margin-bottom: 0 !important;
+}
+
+.rich-text-body.in-compact-preview p:has(br:only-child),
+.rich-text-body.in-compact-preview div:has(br:only-child) {
+  margin: 0 !important;
+  padding: 0 !important;
+  display: none !important;
+}

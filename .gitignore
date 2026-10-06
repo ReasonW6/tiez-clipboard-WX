@@ -45,3 +45,6 @@ git_log_out.txt
 
 # Sub-projects
 mobile-app/
+
+# Claude Code local settings
+.claude/settings.local.json

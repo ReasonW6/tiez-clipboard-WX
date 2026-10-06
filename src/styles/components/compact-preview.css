@@ -103,18 +103,3 @@ body.compact-preview #root>* {
     margin: 0;
     padding: 0;
 }
-
-.compact-preview-root .rich-text-preview> :first-child {
-    margin-top: 0 !important;
-}
-
-.compact-preview-root .rich-text-preview> :last-child {
-    margin-bottom: 0 !important;
-}
-
-.compact-preview-root .rich-text-preview p:has(br:only-child),
-.compact-preview-root .rich-text-preview div:has(br:only-child) {
-    margin: 0 !important;
-    padding: 0 !important;
-    display: none !important;
-}

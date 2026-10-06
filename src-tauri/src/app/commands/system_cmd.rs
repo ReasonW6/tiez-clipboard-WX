@@ -12,16 +12,6 @@ pub fn get_data_path(state: State<'_, AppDataDir>) -> AppResult<String> {
 }
 
 #[tauri::command]
-pub fn open_folder(path: String) -> AppResult<()> {
-    use std::process::Command;
-    Command::new("explorer")
-        .arg(path)
-        .spawn()
-        .map_err(|e| AppError::Internal(format!("Failed to open folder: {}", e)))?;
-    Ok(())
-}
-
-#[tauri::command]
 pub fn open_data_folder(state: State<'_, AppDataDir>) -> AppResult<()> {
     let path = state.0.lock().unwrap();
     let path_str = path.to_string_lossy().to_string();
@@ -31,27 +21,6 @@ pub fn open_data_folder(state: State<'_, AppDataDir>) -> AppResult<()> {
         .arg(path_str)
         .spawn()
         .map_err(|e| AppError::Internal(format!("Failed to open data folder: {}", e)))?;
-    Ok(())
-}
-
-#[tauri::command]
-pub fn open_file_with_default_app(file_path: String) -> AppResult<()> {
-    use std::process::Command;
-    Command::new("explorer")
-        .arg(&file_path)
-        .spawn()
-        .map_err(|e| AppError::Internal(format!("Failed to open file: {}", e)))?;
-    Ok(())
-}
-
-#[tauri::command]
-pub fn open_file_location(file_path: String) -> AppResult<()> {
-    use std::process::Command;
-    Command::new("explorer")
-        .arg("/select,")
-        .arg(&file_path)
-        .spawn()
-        .map_err(|e| AppError::Internal(format!("Failed to open file location: {}", e)))?;
     Ok(())
 }
 
@@ -295,7 +264,6 @@ pub fn get_registry_win_v_optimized_status() -> bool {
     false
 }
 
-#[tauri::command]
 pub fn restart_explorer() -> AppResult<()> {
     use std::os::windows::process::CommandExt;
     use std::process::Command;
@@ -318,55 +286,6 @@ pub fn relaunch(app: AppHandle) {
         let _ = Command::new(exe).spawn();
     }
     app.exit(0);
-}
-
-#[tauri::command]
-pub fn restart_as_admin(app_handle: AppHandle) -> AppResult<()> {
-    use std::env;
-    use std::ffi::OsStr;
-    use std::os::windows::ffi::OsStrExt;
-    use windows::core::PCWSTR;
-    use windows::Win32::UI::Shell::ShellExecuteW;
-    use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
-
-    // Get current executable path
-    let exe_path = env::current_exe().map_err(AppError::from)?;
-
-    // Convert to wide string
-    let exe_wide: Vec<u16> = OsStr::new(&exe_path)
-        .encode_wide()
-        .chain(std::iter::once(0))
-        .collect();
-
-    // "runas" verb for elevation
-    let runas: Vec<u16> = OsStr::new("runas")
-        .encode_wide()
-        .chain(std::iter::once(0))
-        .collect();
-
-    unsafe {
-        let result = ShellExecuteW(
-            None,
-            PCWSTR::from_raw(runas.as_ptr()),
-            PCWSTR::from_raw(exe_wide.as_ptr()),
-            PCWSTR::null(),
-            PCWSTR::null(),
-            SW_SHOWNORMAL,
-        );
-
-        // ShellExecuteW returns > 32 on success
-        if result.0 as usize <= 32 {
-            return Err(AppError::Internal(
-                "Failed to restart as administrator. User may have cancelled UAC prompt."
-                    .to_string(),
-            ));
-        }
-    }
-
-    // Close current instance
-    app_handle.exit(0);
-
-    Ok(())
 }
 
 #[tauri::command]

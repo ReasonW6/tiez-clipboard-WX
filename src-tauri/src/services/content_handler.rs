@@ -80,7 +80,10 @@ pub async fn open_content(
         )?;
     }
 
-    let path_str = temp_path.to_str().unwrap().to_string();
+    let path_str = temp_path
+        .to_str()
+        .ok_or_else(|| AppError::Internal("File path is not valid Unicode".to_string()))?
+        .to_string();
     let file_path_clone = temp_path.clone();
 
     // Launch the file with appropriate application
