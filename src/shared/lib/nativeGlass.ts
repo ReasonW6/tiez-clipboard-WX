@@ -45,6 +45,14 @@ interface GeometrySnapshot {
 
 const lenses = new Set<Lens>();
 let generation = 0;
+let wakeMeasurement: (() => void) | undefined;
+
+// Per-frame sampling stops after this long without movement and resumes on any
+// signal that can move a lens. The slow sample covers anything not signalled.
+const SETTLE_MS = 500;
+const IDLE_SAMPLE_MS = 250;
+const WAKE_EVENTS = ["scroll", "resize", "pointerover", "pointerout", "pointerdown", "pointerup", "pointercancel",
+  "focusin", "focusout", "keydown", "keyup", "transitionrun", "animationstart", "load", "visibilitychange"];
 let pendingGeometry: { generation: number; geometry: NativeGlassGeometry; accepted?: (revision: number) => void } | undefined;
 let sendingGeometry = false;
 
@@ -193,6 +201,7 @@ function measureLens(lens: Lens, viewportWidth: number, viewportHeight: number, 
 export function registerGlassLens(host: HTMLElement, element: HTMLElement, radius: number, material: GlassSurfaceMaterial = "clear"): () => void {
   const lens: Lens = { host, element, radius, material, pressed: false, pressure: 0 };
   lenses.add(lens);
+  wakeMeasurement?.();
   const interaction = host.closest<HTMLElement>(".glass-slider-control, .type-filter-btn") ?? host;
   const press = (event: PointerEvent) => { if (event.button === 0) lens.pressed = true; };
   const release = () => { lens.pressed = false; };
@@ -207,6 +216,7 @@ export function registerGlassLens(host: HTMLElement, element: HTMLElement, radiu
   window.addEventListener("blur", release);
   return () => {
     lenses.delete(lens);
+    wakeMeasurement?.();
     delete element.dataset.nativeGlass;
     interaction.removeEventListener("pointerdown", press);
     interaction.removeEventListener("keydown", keyDown);
@@ -228,6 +238,9 @@ export function startNativeGlass() {
   let submittedGeometry: GeometrySnapshot | undefined;
   let previousTime = 0;
   let frame = 0;
+  let idleSample = 0;
+  let signalled = true;
+  let lastMovement = 0;
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   const reducedTransparency = window.matchMedia("(prefers-reduced-transparency: reduce)");
   const forcedColors = window.matchMedia("(forced-colors: active)");
@@ -255,11 +268,24 @@ export function startNativeGlass() {
       setPresentation(allowed && ready, allowed && (ready || latestStatus?.state === "resizing"));
     }
   };
+  const sample = () => {
+    idleSample = 0;
+    if (!frame && current()) frame = requestAnimationFrame(measure);
+  };
+  const wake = () => {
+    signalled = true;
+    if (frame || !current()) return;
+    clearTimeout(idleSample);
+    // Press easing resumes from a normal frame step, not the idle gap.
+    previousTime = 0;
+    sample();
+  };
   const acceptStatus = (status: NativeGlassStatus) => {
     if (!current() || !validStatus(status) || (latestStatus && status.revision <= latestStatus.revision)) return;
     latestStatus = status;
     updateSubmittedGeometry();
     updateReady();
+    wake();
   };
   setPresentation(false, false);
   const listenerReady = getCurrentWebviewWindow().listen<NativeGlassStatus>("native-glass-status", event => acceptStatus(event.payload))
@@ -269,10 +295,13 @@ export function startNativeGlass() {
   forcedColors.addEventListener("change", updateReady);
 
   const measure = (time: number) => {
+    frame = 0;
     if (!current()) return;
+    let moved = signalled;
+    signalled = false;
     // Also read the live value: browser media emulation can update .matches
     // without delivering a change event to existing MediaQueryLists.
-    if (transparencyAllowed !== (!reducedTransparency.matches && !forcedColors.matches)) updateReady();
+    if (transparencyAllowed !== (!reducedTransparency.matches && !forcedColors.matches)) { updateReady(); moved = true; }
     const delta = previousTime ? Math.min(64, Math.max(0, time - previousTime)) : 16;
     previousTime = time;
     const geometry: NativeGlassGeometry = { viewportWidth: window.innerWidth, viewportHeight: window.innerHeight, controls: [] };
@@ -284,6 +313,7 @@ export function startNativeGlass() {
       const target = !reducedMotion.matches && lens.pressed ? 1 : 0;
       lens.pressure = reducedMotion.matches ? 0 : lens.pressure + (target - lens.pressure) * (1 - Math.exp(-delta / 55));
       if (Math.abs(lens.pressure - target) < .001) lens.pressure = target;
+      else moved = true;
       const control = transparencyAllowed ? measureLens(lens, geometry.viewportWidth, geometry.viewportHeight, measurement) : undefined;
       if (control) measured.set(lens.element, { control, key: geometryKey(control) });
     }
@@ -297,7 +327,7 @@ export function startNativeGlass() {
       // until that geometry and paint-order slot belong to a submitted frame.
       // Identical React remounts can reuse the already confirmed footprint.
       const eligible = confirmed.has(lens.element) ? "true" : "false";
-      if (lens.element.dataset.nativeGlass !== eligible) lens.element.dataset.nativeGlass = eligible;
+      if (lens.element.dataset.nativeGlass !== eligible) { lens.element.dataset.nativeGlass = eligible; moved = true; }
     }
     // The protocol array is the real back-to-front order, independent of React
     // effect registration. Overflow retains the complete CSS material.
@@ -307,6 +337,7 @@ export function startNativeGlass() {
     const fingerprint = JSON.stringify(geometry);
     if (fingerprint !== lastGeometry) {
       lastGeometry = fingerprint;
+      moved = true;
       queueGeometry(geometry, currentGeneration, receipt => {
         receipts.set(receipt, { viewportWidth: geometry.viewportWidth, viewportHeight: geometry.viewportHeight,
           keys: [...selected].map(element => measured.get(element)!.key) });
@@ -318,12 +349,23 @@ export function startNativeGlass() {
         }
         // The frame event may arrive before its IPC reply.
         updateSubmittedGeometry();
+        // Only a later measurement can confirm the acknowledged footprint.
+        wake();
       });
     }
     // ResizeObserver misses transforms and scroll-driven movement. These few
-    // hosts are sampled once per frame; unchanged snapshots never cross IPC.
-    frame = requestAnimationFrame(measure);
+    // hosts are sampled once per frame while anything moves, animates or was
+    // signalled; unchanged snapshots never cross IPC.
+    if (moved || document.getAnimations().some(animation => animation.playState === "running")) lastMovement = time;
+    if (time - lastMovement < SETTLE_MS) frame = requestAnimationFrame(measure);
+    else idleSample = window.setTimeout(sample, IDLE_SAMPLE_MS);
   };
+  for (const query of [reducedMotion, reducedTransparency, forcedColors]) query.addEventListener("change", wake);
+  const mutations = new MutationObserver(wake);
+  mutations.observe(document.documentElement, { attributes: true, childList: true, characterData: true, subtree: true });
+  for (const type of WAKE_EVENTS) window.addEventListener(type, wake, { capture: true, passive: true });
+  document.fonts?.addEventListener("loadingdone", wake);
+  wakeMeasurement = wake;
   frame = requestAnimationFrame(measure);
 
   return {
@@ -332,6 +374,7 @@ export function startNativeGlass() {
       lastGeometry = ""; // The new backend must receive even unchanged rects.
       receipts.clear();
       updateSubmittedGeometry();
+      wake();
       await listenerReady;
       if (!current()) return;
       try {
@@ -350,9 +393,15 @@ export function startNativeGlass() {
       if (disposed) return;
       disposed = true;
       cancelAnimationFrame(frame);
+      clearTimeout(idleSample);
       unlisten?.();
       reducedTransparency.removeEventListener("change", updateReady);
       forcedColors.removeEventListener("change", updateReady);
+      for (const query of [reducedMotion, reducedTransparency, forcedColors]) query.removeEventListener("change", wake);
+      mutations.disconnect();
+      for (const type of WAKE_EVENTS) window.removeEventListener(type, wake, { capture: true });
+      document.fonts?.removeEventListener("loadingdone", wake);
+      if (wakeMeasurement === wake) wakeMeasurement = undefined;
       if (currentGeneration === generation) {
         ++generation;
         setPresentation(false, false);
