@@ -101,6 +101,7 @@ fn main() {
             app::commands::set_win_clipboard_disabled,
             app::commands::trigger_registry_win_v_optimization,
             app::commands::is_registry_win_v_optimized,
+            app::commands::restart_explorer,
             app::commands::check_is_admin,
             app::commands::quit,
             app::commands::relaunch,

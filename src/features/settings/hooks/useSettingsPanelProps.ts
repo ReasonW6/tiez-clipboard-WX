@@ -12,7 +12,7 @@ interface UseSettingsPanelPropsOptions {
   colorMode: string;
   hotkeyParts: string[];
   checkHotkeyConflict: (newHotkey: string, mode: "main" | "sequential" | "rich" | "search") => boolean;
-  updateHotkey: (key: string) => void;
+  updateHotkey: (key: string) => Promise<boolean>;
   updateSequentialHotkey: (key: string) => void;
   updateRichPasteHotkey: (key: string) => void;
   updateSearchHotkey: (key: string) => void;

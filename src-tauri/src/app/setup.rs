@@ -1051,6 +1051,9 @@ fn setup_taskbar_listener(app: &App) {
 }
 
 pub fn handle_global_shortcut(app: &AppHandle, shortcut: &tauri_plugin_global_shortcut::Shortcut) {
+    if IS_RECORDING.load(Ordering::SeqCst) {
+        return;
+    }
     use tauri_plugin_global_shortcut::Shortcut;
     let settings = app.state::<SettingsState>();
 
@@ -1125,6 +1128,7 @@ pub fn handle_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
                     }
                 }
             } else {
+                crate::app::hooks::cancel_recording(window.app_handle());
                 handle_blur(window);
             }
         }

@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import type { ComponentType, ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { getHotkeyDisplayTokens } from "../../../../shared/lib/hotkeyDisplay";
+import { ask, message } from "@tauri-apps/plugin-dialog";
+import HotkeyRecorder from "../HotkeyRecorder";
 import { isMacPlatform } from "../../../../shared/lib/platform";
 import type { QuickPasteModifier } from "../../../app/types";
 
@@ -72,7 +73,7 @@ interface ClipboardSettingsGroupProps {
     isRecording: boolean;
     setIsRecording: (val: boolean) => void;
     hotkeyParts: string[];
-    updateHotkey: (key: string) => void;
+    updateHotkey: (key: string) => Promise<boolean>;
     hotkey: string;
     appSettings: Record<string, string>;
     theme: string;
@@ -99,6 +100,8 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
         props.persistentLimit.toString()
     );
     const [maskSettingsOpen, setMaskSettingsOpen] = useState(false);
+    const [winVBusy, setWinVBusy] = useState(false);
+    const winVEnabled = props.appSettings["app.use_win_v_shortcut"] === "true";
 
     useEffect(() => {
         setPersistentLimitDraft(props.persistentLimit.toString());
@@ -117,15 +120,6 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
         if (clamped.toString() !== source) {
             setPersistentLimitDraft(clamped.toString());
         }
-    };
-
-    const renderHotkeyCaps = (hotkey: string) => {
-        const tokens = getHotkeyDisplayTokens(hotkey);
-        if (tokens.length === 0) {
-            return <div className="key-cap" style={{ width: '8em', opacity: 0.5 }}>{props.t('not_set')}</div>;
-        }
-        const label = tokens.map((token) => token.label).join(isMacPlatform() ? " " : " + ");
-        return <div className="key-cap key-cap-chord" title={label}>{label}</div>;
     };
 
     return (
@@ -295,90 +289,26 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
                             <span className="item-label">{props.t('rich_paste_hotkey_label')}</span>
                             <span className="hint">{props.isRecordingRich ? props.t('hotkey_recording_esc') : props.t('hotkey_click_hint')}</span>
                         </div>
-                        <div
-                            className={`key-group ${props.isRecordingRich ? 'recording' : ''}`}
-                            onClick={(e) => { props.setIsRecordingRich(true); e.currentTarget.focus(); }}
-                            tabIndex={0}
-                            onKeyDown={(e) => {
-                                if (!props.isRecordingRich) return;
-                                e.preventDefault();
-                                e.stopPropagation();
-
-                                if (e.key === 'Escape') {
-                                    props.setIsRecordingRich(false);
-                                    return;
-                                }
-
-                                if (e.key === 'Backspace' || e.key === 'Delete') {
-                                    props.updateRichPasteHotkey('');
-                                    props.setIsRecordingRich(false);
-                                    return;
-                                }
-
-                                const modifiers = [];
-                                if (e.ctrlKey) modifiers.push('Ctrl');
-                                if (e.shiftKey) modifiers.push('Shift');
-                                if (e.altKey) modifiers.push('Alt');
-                                if (e.metaKey) modifiers.push('Command');
-
-                                const key = e.key.toUpperCase();
-                                if (['CONTROL', 'SHIFT', 'ALT', 'META'].includes(key)) return;
-
-                                const newHotkey = [...modifiers, key].join('+');
-                                props.updateRichPasteHotkey(newHotkey);
-                            }}
-                        >
-                            {props.isRecordingRich ? (
-                                <div className="key-cap" style={{ width: '8em' }}>{props.t('waiting_for_input')}</div>
-                            ) : (
-                                renderHotkeyCaps(props.richPasteHotkey)
-                            )}
-                        </div>
+                        <HotkeyRecorder
+                            hotkey={props.richPasteHotkey}
+                            isRecording={props.isRecordingRich}
+                            setIsRecording={props.setIsRecordingRich}
+                            onRecord={props.updateRichPasteHotkey}
+                            t={props.t}
+                        />
                     </div>
                     <div className="setting-item">
                         <div className="item-label-group">
                             <span className="item-label">{props.t('search_hotkey_label')}</span>
                             <span className="hint">{props.isRecordingSearch ? props.t('hotkey_recording_esc') : props.t('hotkey_click_hint')}</span>
                         </div>
-                        <div
-                            className={`key-group ${props.isRecordingSearch ? 'recording' : ''}`}
-                            onClick={(e) => { props.setIsRecordingSearch(true); e.currentTarget.focus(); }}
-                            tabIndex={0}
-                            onKeyDown={(e) => {
-                                if (!props.isRecordingSearch) return;
-                                e.preventDefault();
-                                e.stopPropagation();
-
-                                if (e.key === 'Escape') {
-                                    props.setIsRecordingSearch(false);
-                                    return;
-                                }
-
-                                if (e.key === 'Backspace' || e.key === 'Delete') {
-                                    props.updateSearchHotkey('');
-                                    props.setIsRecordingSearch(false);
-                                    return;
-                                }
-
-                                const modifiers = [];
-                                if (e.ctrlKey) modifiers.push('Ctrl');
-                                if (e.shiftKey) modifiers.push('Shift');
-                                if (e.altKey) modifiers.push('Alt');
-                                if (e.metaKey) modifiers.push('Command');
-
-                                const key = e.key.toUpperCase();
-                                if (['CONTROL', 'SHIFT', 'ALT', 'META'].includes(key)) return;
-
-                                const newHotkey = [...modifiers, key].join('+');
-                                props.updateSearchHotkey(newHotkey);
-                            }}
-                        >
-                            {props.isRecordingSearch ? (
-                                <div className="key-cap" style={{ width: '8em' }}>{props.t('waiting_for_input')}</div>
-                            ) : (
-                                renderHotkeyCaps(props.searchHotkey)
-                            )}
-                        </div>
+                        <HotkeyRecorder
+                            hotkey={props.searchHotkey}
+                            isRecording={props.isRecordingSearch}
+                            setIsRecording={props.setIsRecordingSearch}
+                            onRecord={props.updateSearchHotkey}
+                            t={props.t}
+                        />
                     </div>
                     <div className="setting-item">
                         <props.LabelWithHint
@@ -483,45 +413,13 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
                                 <span className="item-label">{props.t('sequential_paste_hotkey_label')}</span>
                                 <span className="hint">{props.isRecordingSequential ? props.t('hotkey_recording_esc') : props.t('hotkey_click_hint')}</span>
                             </div>
-                            <div
-                                className={`key-group ${props.isRecordingSequential ? 'recording' : ''}`}
-                                onClick={(e) => { props.setIsRecordingSequential(true); e.currentTarget.focus(); }}
-                                tabIndex={0}
-                                onKeyDown={(e) => {
-                                    if (!props.isRecordingSequential) return;
-                                    e.preventDefault();
-                                    e.stopPropagation();
-
-                                    if (e.key === 'Escape') {
-                                        props.setIsRecordingSequential(false);
-                                        return;
-                                    }
-
-                                    if (e.key === 'Backspace' || e.key === 'Delete') {
-                                        props.updateSequentialHotkey('');
-                                        props.setIsRecordingSequential(false);
-                                        return;
-                                    }
-
-                                    const modifiers = [];
-                                    if (e.ctrlKey) modifiers.push('Ctrl');
-                                    if (e.shiftKey) modifiers.push('Shift');
-                                    if (e.altKey) modifiers.push('Alt');
-                                    if (e.metaKey) modifiers.push('Command');
-
-                                    const key = e.key.toUpperCase();
-                                    if (['CONTROL', 'SHIFT', 'ALT', 'META'].includes(key)) return;
-
-                                    const newHotkey = [...modifiers, key].join('+');
-                                    props.updateSequentialHotkey(newHotkey);
-                                }}
-                            >
-                                {props.isRecordingSequential ? (
-                                    <div className="key-cap" style={{ width: '8em' }}>{props.t('waiting_for_input')}</div>
-                                ) : (
-                                    renderHotkeyCaps(props.sequentialHotkey)
-                                )}
-                            </div>
+                            <HotkeyRecorder
+                                hotkey={props.sequentialHotkey}
+                                isRecording={props.isRecordingSequential}
+                                setIsRecording={props.setIsRecordingSequential}
+                                onRecord={props.updateSequentialHotkey}
+                                t={props.t}
+                            />
                         </div>
                     )}
 
@@ -703,48 +601,63 @@ const ClipboardSettingsGroup = (props: ClipboardSettingsGroupProps) => {
                             <span className="hint">{props.isRecording ? props.t('hotkey_recording_esc') : props.t('hotkey_click_hint')}</span>
                         </div>
 
-                        <div
-                            className={`key-group ${props.isRecording ? 'recording' : ''}`}
-                            onClick={(e) => { props.setIsRecording(true); e.currentTarget.focus(); }}
-                            tabIndex={0}
-                            onKeyDown={(e) => {
-                                if (!props.isRecording) return;
-                                e.preventDefault();
-                                e.stopPropagation();
-
-                                if (e.key === 'Escape') {
-                                    props.setIsRecording(false);
-                                    return;
-                                }
-
-                                if (e.key === 'Backspace' || e.key === 'Delete') {
-                                    props.updateHotkey('');
-                                    props.setIsRecording(false);
-                                    return;
-                                }
-
-                                const modifiers = [];
-                                if (e.ctrlKey) modifiers.push('Ctrl');
-                                if (e.shiftKey) modifiers.push('Shift');
-                                if (e.altKey) modifiers.push('Alt');
-                                if (e.metaKey) modifiers.push('Command');
-
-                                const key = e.key.toUpperCase();
-                                if (['CONTROL', 'SHIFT', 'ALT', 'META'].includes(key)) return;
-
-                                const newHotkey = [...modifiers, key].join('+');
-                                props.updateHotkey(newHotkey);
-                            }}
-                        >
-                            {props.isRecording ? (
-                                <div className="key-cap" style={{ width: '8em' }}>{props.t('waiting_for_input')}</div>
-                            ) : (
-                                renderHotkeyCaps(props.hotkey)
-                            )}
-                        </div>
+                        <HotkeyRecorder
+                            hotkey={props.hotkey}
+                            isRecording={props.isRecording}
+                            setIsRecording={props.setIsRecording}
+                            onRecord={props.updateHotkey}
+                            t={props.t}
+                            disabled={winVEnabled || winVBusy}
+                        />
                     </div>
 
-                    {/* macOS cleanup: Removed Win+V Shortcut switch */}
+                    {!isMacPlatform() && (
+                        <div className="setting-item">
+                            <props.LabelWithHint
+                                label={props.t('use_win_v_shortcut')}
+                                hint={props.t('use_win_v_shortcut_hint')}
+                                hintKey="use_win_v_shortcut"
+                            />
+                            <label className="switch">
+                                <input
+                                    className="cb"
+                                    type="checkbox"
+                                    aria-label={props.t('use_win_v_shortcut')}
+                                    checked={winVEnabled}
+                                    disabled={winVBusy}
+                                    onChange={async event => {
+                                        const enabled = event.target.checked;
+                                        const previous = props.appSettings['app.pre_win_v_hotkey'];
+                                        const target = enabled ? 'Win+V' : previous !== undefined && previous !== 'Win+V' ? previous : 'Alt+V';
+                                        if (props.checkHotkeyConflict(target, 'main')) return;
+                                        setWinVBusy(true);
+                                        try {
+                                            const changed = await invoke<boolean>('trigger_registry_win_v_optimization', { enable: enabled });
+                                            if (changed && await ask(props.t('restart_explorer_confirm'), {
+                                                title: props.t('restart_explorer_title'), kind: 'warning'
+                                            })) {
+                                                await invoke('restart_explorer');
+                                                await new Promise(resolve => setTimeout(resolve, 1500));
+                                            }
+                                            if (!await props.updateHotkey(target)) {
+                                                await invoke('trigger_registry_win_v_optimization', { enable: !enabled });
+                                                return;
+                                            }
+                                            if (enabled && props.hotkey !== 'Win+V') {
+                                                props.saveAppSetting('pre_win_v_hotkey', props.hotkey);
+                                            }
+                                            props.saveAppSetting('use_win_v_shortcut', String(enabled));
+                                        } catch (error) {
+                                            await message(props.t('error') + ': ' + String(error), { kind: 'error' });
+                                        } finally {
+                                            setWinVBusy(false);
+                                        }
+                                    }}
+                                />
+                                <div className="toggle"><div className="left" /><div className="right" /></div>
+                            </label>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

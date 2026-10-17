@@ -426,6 +426,7 @@ pub fn hide_window_cmd(app_handle: AppHandle) -> Result<(), String> {
 }
 
 pub fn hide_main_window(app: &AppHandle) -> Result<(), String> {
+    crate::app::hooks::cancel_recording(app);
     if let Some(window) = app.get_webview_window("main") {
         let was_visible = window.is_visible().unwrap_or(true);
         let _ = window.set_focusable(false);

@@ -73,6 +73,11 @@ pub fn test_hotkey_available(app_handle: AppHandle, hotkey: String) -> AppResult
         .parse::<Shortcut>()
         .map_err(|_| AppError::Validation("快捷键格式无效".to_string()))?;
 
+    // Re-recording one of our own shortcuts must not unregister it during the probe.
+    if app_handle.global_shortcut().is_registered(shortcut) {
+        return Ok(true);
+    }
+
     match app_handle.global_shortcut().register(shortcut.clone()) {
         Ok(_) => {
             let _ = app_handle.global_shortcut().unregister(shortcut);

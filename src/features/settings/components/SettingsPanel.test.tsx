@@ -16,7 +16,7 @@ const SettingsHarness = ({ subpage }: { subpage: SettingsSubpage }) => {
     colorMode: "light",
     hotkeyParts: ["Win", "V"],
     checkHotkeyConflict: () => false,
-    updateHotkey: noop,
+    updateHotkey: async () => true,
     updateSequentialHotkey: noop,
     updateRichPasteHotkey: noop,
     updateSearchHotkey: noop,

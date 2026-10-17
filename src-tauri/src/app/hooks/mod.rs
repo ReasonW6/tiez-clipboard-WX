@@ -20,6 +20,22 @@ use crate::infrastructure::windows_ext::WindowExt;
 
 // Store registered hotkey IDs for cleanup
 static BLOCKED_HOTKEY_IDS: std::sync::Mutex<Vec<i32>> = std::sync::Mutex::new(Vec::new());
+#[cfg(target_os = "windows")]
+static RECORDING_WIN_KEYS: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
+#[cfg(target_os = "windows")]
+fn recording_win_keys_after_event(pressed: u32, vk: u32, is_down: bool) -> u32 {
+    let bit = match vk {
+        0x5B => 1,
+        0x5C => 2,
+        _ => return pressed,
+    };
+    if is_down {
+        pressed | bit
+    } else {
+        pressed & !bit
+    }
+}
 
 #[cfg(target_os = "windows")]
 fn quick_paste_index_from_vk(vk: u32) -> Option<usize> {
@@ -73,12 +89,19 @@ fn quick_paste_modifier_active(
 
 #[tauri::command]
 pub fn set_recording_mode(app_handle: AppHandle, enabled: bool) -> Result<(), String> {
-    IS_RECORDING.store(enabled, Ordering::SeqCst);
-
     let mut ids = BLOCKED_HOTKEY_IDS.lock().unwrap();
+    IS_RECORDING.store(enabled, Ordering::SeqCst);
 
     #[cfg(target_os = "windows")]
     if enabled {
+        if !ids.is_empty() {
+            return Ok(());
+        }
+        unsafe {
+            let left = (GetAsyncKeyState(VK_LWIN.0 as i32) as u16 & 0x8000 != 0) as u32;
+            let right = (GetAsyncKeyState(VK_RWIN.0 as i32) as u16 & 0x8000 != 0) as u32;
+            RECORDING_WIN_KEYS.store(left | (right << 1), Ordering::SeqCst);
+        }
         // Register ALL Win+ combinations to block system from handling them
         if let Some(window) = app_handle.get_webview_window("main") {
             if let Ok(hwnd_raw) = window.hwnd() {
@@ -142,6 +165,14 @@ pub fn set_recording_mode(app_handle: AppHandle, enabled: bool) -> Result<(), St
     Ok(())
 }
 
+pub fn cancel_recording(app: &AppHandle) {
+    let has_blocked_keys = !BLOCKED_HOTKEY_IDS.lock().unwrap().is_empty();
+    if IS_RECORDING.load(Ordering::SeqCst) || has_blocked_keys {
+        let _ = set_recording_mode(app.clone(), false);
+        let _ = app.emit("recording-cancelled", ());
+    }
+}
+
 // Low-level Keyboard Hook Procedure
 #[cfg(target_os = "windows")]
 pub unsafe extern "system" fn keyboard_proc(
@@ -159,11 +190,14 @@ pub unsafe extern "system" fn keyboard_proc(
 
         // Handle Recording Mode - Black Hole Logic
         if IS_RECORDING.load(Ordering::SeqCst) {
+            // Win events are swallowed, so Windows' async key state cannot track them.
+            let _ = RECORDING_WIN_KEYS.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |pressed| {
+                Some(recording_win_keys_after_event(pressed, vk, is_down))
+            });
             let ctrl_down = GetAsyncKeyState(VK_CONTROL.0 as i32) as u16 & 0x8000 != 0;
             let shift_down = GetAsyncKeyState(VK_SHIFT.0 as i32) as u16 & 0x8000 != 0;
             let alt_down = GetAsyncKeyState(VK_MENU.0 as i32) as u16 & 0x8000 != 0;
-            let win_down = (GetAsyncKeyState(VK_LWIN.0 as i32) as u16 & 0x8000 != 0)
-                || (GetAsyncKeyState(VK_RWIN.0 as i32) as u16 & 0x8000 != 0);
+            let win_down = RECORDING_WIN_KEYS.load(Ordering::SeqCst) != 0;
 
             // ESC to cancel
             if vk == 0x1B && is_down {
@@ -171,7 +205,7 @@ pub unsafe extern "system" fn keyboard_proc(
                 if let Some(handle) = GLOBAL_APP_HANDLE.get() {
                     let _ = handle.emit("recording-cancelled", ());
                 }
-                return CallNextHookEx(None, n_code, w_param, l_param);
+                return LRESULT(1);
             }
 
             let is_win = vk == 0x5B || vk == 0x5C;
@@ -216,14 +250,18 @@ pub unsafe extern "system" fn keyboard_proc(
                         _ => format!("Key_{}", vk),
                     };
 
-                    let final_hotkey = format!(
-                        "{}{}{}{}{}",
-                        if ctrl_down { "Ctrl+" } else { "" },
-                        if shift_down { "Shift+" } else { "" },
-                        if alt_down { "Alt+" } else { "" },
-                        if win_down { "Win+" } else { "" },
-                        key_name
-                    );
+                    let final_hotkey = if vk == 0x08 || vk == 0x2E {
+                        String::new()
+                    } else {
+                        format!(
+                            "{}{}{}{}{}",
+                            if ctrl_down { "Ctrl+" } else { "" },
+                            if shift_down { "Shift+" } else { "" },
+                            if alt_down { "Alt+" } else { "" },
+                            if win_down { "Win+" } else { "" },
+                            key_name
+                        )
+                    };
 
                     println!("Recorded Hotkey: {}", final_hotkey);
                     let _ = handle.emit("hotkey-recorded", final_hotkey);
@@ -569,4 +607,26 @@ pub fn is_win_v_hotkey(hotkey: &str) -> bool {
     }
 
     has_win && has_v
+}
+
+#[cfg(all(test, target_os = "windows"))]
+mod recording_tests {
+    use super::recording_win_keys_after_event;
+
+    #[test]
+    fn swallowed_win_down_is_retained_until_key_up() {
+        let pressed = recording_win_keys_after_event(0, 0x5B, true);
+        let pressed = recording_win_keys_after_event(pressed, 0x56, true);
+        assert_ne!(pressed, 0, "Win+V must retain its Win modifier");
+        assert_eq!(recording_win_keys_after_event(pressed, 0x5B, false), 0);
+    }
+
+    #[test]
+    fn releasing_one_win_key_keeps_the_other_pressed() {
+        let pressed = recording_win_keys_after_event(0, 0x5B, true);
+        let pressed = recording_win_keys_after_event(pressed, 0x5C, true);
+        let pressed = recording_win_keys_after_event(pressed, 0x5B, false);
+        assert_ne!(pressed, 0);
+        assert_eq!(recording_win_keys_after_event(pressed, 0x5C, false), 0);
+    }
 }

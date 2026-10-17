@@ -178,7 +178,7 @@ interface SettingsPanelProps {
     setIsRecording: (val: boolean) => void;
     isRecording: boolean;
     hotkeyParts: string[];
-    updateHotkey: (key: string) => void;
+    updateHotkey: (key: string) => Promise<boolean>;
 
     setTheme: (val: string) => void;
     setColorMode: (val: string) => void;

@@ -264,6 +264,7 @@ pub fn get_registry_win_v_optimized_status() -> bool {
     false
 }
 
+#[tauri::command]
 pub fn restart_explorer() -> AppResult<()> {
     use std::os::windows::process::CommandExt;
     use std::process::Command;

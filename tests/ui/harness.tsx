@@ -33,6 +33,7 @@ if (params.get("empty") === "true") entries = [];
 let savedTags = ["工作", "代码", "密码", "个人收藏", "一个很长的标签名称用于验证数量不会被截断", "空标签"];
 let theme = "dark";
 let pinned = true;
+let recording = false;
 const calls: {command: string; args: any}[] = [];
 const delays: Record<string, number> = {};
 const failures: Record<string, boolean> = {};
@@ -43,7 +44,17 @@ mockIPC(async (command, args: any = {}) => {
   calls.push({ command, args });
   switch (command) {
     case "get_settings": await pause(Number(params.get("settingsDelay") || "0")); return { ...settings };
+    case "set_recording_mode":
+      recording = args.enabled;
+      if (recording && params.has("immediateHotkey")) await emit("hotkey-recorded", params.get("immediateHotkey"));
+      return null;
+    case "test_hotkey_available":
+      if (recording && args.hotkey.startsWith("Win+")) throw new Error("recorder still owns this shortcut");
+      return args.hotkey !== "Ctrl+Shift+X";
+    case "trigger_registry_win_v_optimization": return params.get("winVChanged") === "true";
+    case "plugin:dialog|ask": return params.get("confirmExplorerRestart") === "true";
     case "save_setting": settings[args.key] = args.value; localStorage.setItem("fixture-settings", JSON.stringify(settings)); return null;
+    case "set_sequential_mode": settings["app.sequential_mode"] = String(args.enabled); localStorage.setItem("fixture-settings", JSON.stringify(settings)); return null;
     case "get_platform_info": return { platform: "windows", is_windows_10: params.get("win10") === "true", is_windows_11: params.get("win10") !== "true" };
     case "set_theme":
       await pause(args.colorMode === "dark" ? 80 : 5);

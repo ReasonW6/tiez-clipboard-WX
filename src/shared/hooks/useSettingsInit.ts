@@ -44,7 +44,7 @@ export const useSettingsInit = ({
           if (disposed || request !== settingsEffectCount.current) return;
 
           setAppSettings(result);
-          if (result["app.hotkey"]) setHotkey(result["app.hotkey"]);
+          if (result["app.hotkey"] !== undefined) setHotkey(result["app.hotkey"]);
 
           const loadedTheme = normalizeThemeId(result["app.theme"] || DEFAULT_THEME);
           const loadedColorMode = result["app.color_mode"] || "system";
