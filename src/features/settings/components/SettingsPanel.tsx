@@ -1,5 +1,5 @@
 
-import { memo, useState, useEffect, useCallback } from "react";
+import { createContext, memo, useState, useEffect, useCallback, useContext, useMemo } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { ChevronRight, HelpCircle } from "lucide-react";
 import type { Locale } from "../../../shared/types";
@@ -17,6 +17,51 @@ import DefaultAppsSettingsGroup from "./groups/DefaultAppsSettingsGroup";
 import DataSettingsGroup from "./groups/DataSettingsGroup";
 
 import SettingsFooter from "./SettingsFooter";
+
+// Ask once, at startup: the panel remounts on every visit, and an unknown
+// version briefly showed a placeholder number in the footer.
+let knownVersion = "";
+let versionRequest: Promise<string> | undefined;
+const requestVersion = () => versionRequest ??= getVersion()
+    .then(version => (knownVersion = version))
+    .catch(err => {
+        console.error("Failed to get version:", err);
+        return knownVersion;
+    });
+if (typeof window !== "undefined") void requestVersion();
+
+const HintContext = createContext<{ openHints: Set<string>; toggleHint: (key: string) => void }>({
+    openHints: new Set(), toggleHint: () => {}
+});
+
+// A component defined inside SettingsPanel is a new type on every render, so
+// each settings change remounted every labelled row.
+const LabelWithHint = ({ label, hint, hintKey }: { label: string; hint?: string | React.ReactNode; hintKey: string }) => {
+    const { openHints, toggleHint } = useContext(HintContext);
+    return (
+        <div className="item-label-group">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span className="item-label">{label}</span>
+                {hint && (
+                    <button
+                        type="button"
+                        className="hint-icon-btn"
+                        title={typeof hint === 'string' ? hint : undefined}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            toggleHint(hintKey);
+                        }}
+                    >
+                        <HelpCircle size={12} />
+                    </button>
+                )}
+            </div>
+            {hint && openHints.has(hintKey) && (
+                typeof hint === 'string' ? <span className="hint">{hint}</span> : hint
+            )}
+        </div>
+    );
+};
 
 interface SettingsPanelProps {
     t: (key: string) => string;
@@ -179,7 +224,7 @@ const SettingsPanel = (props: SettingsPanelProps) => {
         } = props;
 
     const [emailCopied, setEmailCopied] = useState(false);
-    const [appVersion, setAppVersion] = useState("");
+    const [appVersion, setAppVersion] = useState(knownVersion);
 
     const [updateStatus, setUpdateStatus] = useState<string>("");
     // Removed updateModalData
@@ -187,47 +232,20 @@ const SettingsPanel = (props: SettingsPanelProps) => {
     const [privacyKindsOpen, setPrivacyKindsOpen] = useState(false);
     const [privacyRulesOpen, setPrivacyRulesOpen] = useState(false);
 
-    const toggleHint = (key: string) => {
+    const toggleHint = useCallback((key: string) => {
         setOpenHints(prev => {
             const next = new Set(prev);
             if (next.has(key)) next.delete(key);
             else next.add(key);
             return next;
         });
-    };
-
-    const LabelWithHint = ({ label, hint, hintKey }: { label: string; hint?: string | React.ReactNode; hintKey: string }) => (
-        <div className="item-label-group">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span className="item-label">{label}</span>
-                {hint && (
-                    <button
-                        type="button"
-                        className="hint-icon-btn"
-                        title={typeof hint === 'string' ? hint : undefined}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            toggleHint(hintKey);
-                        }}
-                    >
-                        <HelpCircle size={12} />
-                    </button>
-                )}
-            </div>
-            {hint && openHints.has(hintKey) && (
-                typeof hint === 'string' ? <span className="hint">{hint}</span> : hint
-            )}
-        </div>
-    );
+    }, []);
+    const hints = useMemo(() => ({ openHints, toggleHint }), [openHints, toggleHint]);
 
     useEffect(() => {
-        getVersion()
-            .then(v => setAppVersion(v))
-            .catch(err => {
-                console.error("Failed to get version:", err);
-                setAppVersion("0.2.0");
-            });
-
+        let cancelled = false;
+        void requestVersion().then(version => { if (!cancelled) setAppVersion(version); });
+        return () => { cancelled = true; };
     }, []);
 
     const openAdvancedSettingsWindow = useCallback(() => {
@@ -235,6 +253,7 @@ const SettingsPanel = (props: SettingsPanelProps) => {
     }, [setSettingsSubpage]);
 
     return (
+        <HintContext.Provider value={hints}>
         <div
             style={{ display: 'flex', flexDirection: 'column', gap: '4px', minHeight: '100%', flex: 1 }}
         >
@@ -458,6 +477,7 @@ const SettingsPanel = (props: SettingsPanelProps) => {
                 </>
             )}
         </div>
+        </HintContext.Provider>
     );
 };
 

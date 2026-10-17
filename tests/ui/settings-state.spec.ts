@@ -1,6 +1,22 @@
 import { expect, test } from "@playwright/test";
 import { writeFile } from "node:fs/promises";
 
+// Every settings change used to remount each labelled row.
+test("settings refreshes keep labelled rows mounted", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/tests/ui/harness.html?theme=mica");
+  await page.getByTitle("设置", { exact: true }).click();
+  await page.getByRole("heading", { name: "常规设置", exact: true }).click();
+  const hint = page.locator(".group-content .hint-icon-btn").first();
+  await expect(hint).toBeVisible();
+  const connected = await hint.evaluate(async element => {
+    await (window as any).testApp.emit("settings-changed");
+    await new Promise(resolve => setTimeout(resolve, 500));
+    return element.isConnected;
+  });
+  expect(connected).toBe(true);
+});
+
 for (const theme of ["mica", "acrylic"]) for (const mode of ["light", "dark"]) {
   test(`first ${theme} ${mode} settings opening has no module-loading frame`, async ({ page }) => {
     // Amplify the existing cold module boundary without delaying settings data.
