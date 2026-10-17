@@ -83,3 +83,29 @@ for (const theme of ["mica", "acrylic"]) {
     }
   });
 }
+
+// The history list remounts on return; it must not paint an empty frame first.
+for (const title of ["设置", "标签管理"]) {
+  test(`returning from ${title} shows the history cards on the first frame`, async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await page.goto("/tests/ui/harness.html?theme=mica");
+    await expect(page.locator(".history-item")).toHaveCount(6);
+    await page.getByTitle(title, { exact: true }).click();
+    await expect(page.locator(".history-item")).toHaveCount(0);
+    const frames = await page.evaluate(async () => {
+      document.querySelector<HTMLElement>(".header-back")!.click();
+      const counts: number[] = [];
+      const start = performance.now();
+      await new Promise<void>(resolve => {
+        const sample = () => {
+          counts.push(document.querySelectorAll(".history-item").length);
+          if (performance.now() - start < 300) requestAnimationFrame(sample); else resolve();
+        };
+        requestAnimationFrame(sample);
+      });
+      return counts;
+    });
+    expect(frames.length).toBeGreaterThan(1);
+    expect(frames, JSON.stringify(frames)).toEqual(frames.map(() => 6));
+  });
+}

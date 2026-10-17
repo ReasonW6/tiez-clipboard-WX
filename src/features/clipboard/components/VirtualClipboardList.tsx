@@ -140,6 +140,11 @@ const VirtualClipboardList = React.forwardRef<VirtualClipboardListHandle, Virtua
             isLoading
         }), [header, hasMore, isLoading]);
 
+        // Virtuoso renders no rows until it has measured the viewport, so remounting the
+        // list (e.g. returning from settings) painted it empty for a few frames. Render a
+        // window's worth up front; the shortest cards are 64px, or 23px in compact mode.
+        const initialItemCount = Math.min(items.length, Math.ceil(window.innerHeight / (compactMode ? 20 : 60)));
+
         return (
             <div className="virtual-list-wrapper" style={{ height: '100%', width: '100%' }}>
                 <Virtuoso
@@ -148,6 +153,7 @@ const VirtualClipboardList = React.forwardRef<VirtualClipboardListHandle, Virtua
                     itemContent={itemContent}
                     components={components}
                     context={context}
+                    initialItemCount={initialItemCount}
                     style={{ height: '100%' }}
                     onScroll={(e) => handleScroll((e.currentTarget as HTMLElement).scrollTop)}
                     endReached={handleEndReached}
