@@ -18,7 +18,7 @@ pub struct HookHotkey {
 
 pub static TARGET_HOTKEY: std::sync::Mutex<Option<HookHotkey>> = std::sync::Mutex::new(None);
 
-// Win+ hotkeys are now handled via tauri-plugin-global-shortcut.
+// The main Win+V shortcut uses the hook; other shortcuts use global registration.
 
 pub static IS_RECORDING: AtomicBool = AtomicBool::new(false);
 pub static IGNORE_BLUR: AtomicBool = AtomicBool::new(false);

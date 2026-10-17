@@ -21,6 +21,8 @@ test("Win+V takeover restores the previous shortcut and survives a reload", asyn
   await row.locator(".toggle").click();
   await expect(recorder(page)).toHaveText("Win + V");
   await expect(toggle).toBeChecked();
+  expect(await page.evaluate(() => (window as any).testApp.calls.some((call: any) =>
+    call.command === "test_hotkey_available" && call.args.hotkey === "Win+V"))).toBe(false);
   await page.reload();
   await page.getByTitle("设置", { exact: true }).click();
   await page.getByRole("heading", { name: "剪贴板设置", exact: true }).click();

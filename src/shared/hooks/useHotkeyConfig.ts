@@ -83,7 +83,8 @@ export const useHotkeyConfig = ({
         search: { value: searchHotkey, set: setSearchHotkey, key: "search_hotkey", command: "set_search_hotkey" }
       }[target];
       if (hotkeyIdentity(newHotkey) === hotkeyIdentity(config.value)) return true;
-      if (newHotkey && !await invoke<boolean>("test_hotkey_available", { hotkey: newHotkey, currentHotkey: config.value })) {
+      const usesWinVHook = target === "main" && hotkeyIdentity(newHotkey) === hotkeyIdentity("Win+V");
+      if (newHotkey && !usesWinVHook && !await invoke<boolean>("test_hotkey_available", { hotkey: newHotkey, currentHotkey: config.value })) {
         throw new Error(t("hotkey_unavailable"));
       }
       await invoke(config.command, { hotkey: newHotkey });

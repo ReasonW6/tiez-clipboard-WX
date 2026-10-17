@@ -27,7 +27,15 @@ pub(crate) fn sync_registered_hotkeys(app_handle: &AppHandle) -> AppResult<()> {
     };
 
     let main_hotkey = settings.main_hotkey.lock().unwrap().clone();
-    register_shortcut(app_handle, &main_hotkey);
+    let hook_handles_main = cfg!(target_os = "windows") && crate::app::hooks::is_win_v_hotkey(&main_hotkey);
+    *crate::global_state::TARGET_HOTKEY.lock().unwrap() = if hook_handles_main {
+        crate::app::hooks::parse_hotkey_for_hook(&main_hotkey)
+    } else {
+        None
+    };
+    if !hook_handles_main {
+        register_shortcut(app_handle, &main_hotkey);
+    }
 
     let sequential_mode = settings.sequential_mode.load(Ordering::Relaxed);
     let sequential_hotkey = settings.sequential_paste_hotkey.lock().unwrap().clone();

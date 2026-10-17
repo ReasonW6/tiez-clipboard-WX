@@ -22,6 +22,27 @@ use crate::infrastructure::windows_ext::WindowExt;
 static BLOCKED_HOTKEY_IDS: std::sync::Mutex<Vec<i32>> = std::sync::Mutex::new(Vec::new());
 #[cfg(target_os = "windows")]
 static RECORDING_WIN_KEYS: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+#[cfg(target_os = "windows")]
+static WIN_V_PRESSED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+#[cfg(target_os = "windows")]
+#[derive(Debug, PartialEq)]
+enum WinVAction {
+    Pass,
+    Suppress,
+    Toggle,
+}
+
+#[cfg(target_os = "windows")]
+fn win_v_action(pressed: bool, is_down: bool, enabled: bool, win_down: bool, other_modifiers: bool) -> WinVAction {
+    if pressed {
+        WinVAction::Suppress
+    } else if is_down && enabled && win_down && !other_modifiers {
+        WinVAction::Toggle
+    } else {
+        WinVAction::Pass
+    }
+}
 
 #[cfg(target_os = "windows")]
 fn recording_win_keys_after_event(pressed: u32, vk: u32, is_down: bool) -> u32 {
@@ -269,6 +290,27 @@ pub unsafe extern "system" fn keyboard_proc(
                 }
             }
             return LRESULT(1);
+        }
+
+        // Win+V is reserved by the shell, so consume it before Windows sees it.
+        if vk == 0x56 {
+            let enabled = TARGET_HOTKEY.lock().unwrap().is_some();
+            let win_down = (GetAsyncKeyState(VK_LWIN.0 as i32) as u16 & 0x8000 != 0)
+                || (GetAsyncKeyState(VK_RWIN.0 as i32) as u16 & 0x8000 != 0);
+            let other_modifiers = [VK_CONTROL, VK_SHIFT, VK_MENU].iter()
+                .any(|key| GetAsyncKeyState(key.0 as i32) as u16 & 0x8000 != 0);
+            let action = win_v_action(WIN_V_PRESSED.load(Ordering::Relaxed), is_down,
+                enabled, win_down, other_modifiers);
+            if action != WinVAction::Pass {
+                WIN_V_PRESSED.store(is_down, Ordering::Relaxed);
+                if action == WinVAction::Toggle {
+                    if let Some(handle) = GLOBAL_APP_HANDLE.get() {
+                        let app = handle.clone();
+                        let _ = handle.run_on_main_thread(move || toggle_window(&app));
+                    }
+                }
+                return LRESULT(1);
+            }
         }
 
         // 3. Global Paste Sound Trigger (Ctrl+V)
@@ -611,7 +653,32 @@ pub fn is_win_v_hotkey(hotkey: &str) -> bool {
 
 #[cfg(all(test, target_os = "windows"))]
 mod recording_tests {
-    use super::recording_win_keys_after_event;
+    use super::{is_win_v_hotkey, recording_win_keys_after_event, win_v_action, WinVAction};
+
+    #[test]
+    fn win_v_takeover_handles_shell_reserved_aliases_only() {
+        for shortcut in ["Win+V", "Super+V", "V+Meta", "command+v"] {
+            assert!(is_win_v_hotkey(shortcut));
+        }
+        for shortcut in ["V", "Ctrl+V", "Win+Shift+V", "Win+C", ""] {
+            assert!(!is_win_v_hotkey(shortcut));
+        }
+    }
+
+    #[test]
+    fn win_v_consumes_repeat_and_release_after_window_releases_win_keys() {
+        assert_eq!(win_v_action(false, true, true, true, false), WinVAction::Toggle);
+        assert_eq!(win_v_action(true, true, true, false, false), WinVAction::Suppress);
+        assert_eq!(win_v_action(true, false, false, false, false), WinVAction::Suppress);
+        assert_eq!(win_v_action(false, false, true, true, false), WinVAction::Pass);
+    }
+
+    #[test]
+    fn win_v_does_not_capture_disabled_or_other_shortcuts() {
+        assert_eq!(win_v_action(false, true, false, true, false), WinVAction::Pass);
+        assert_eq!(win_v_action(false, true, true, false, false), WinVAction::Pass);
+        assert_eq!(win_v_action(false, true, true, true, true), WinVAction::Pass);
+    }
 
     #[test]
     fn swallowed_win_down_is_retained_until_key_up() {

@@ -54,6 +54,7 @@ mockIPC(async (command, args: any = {}) => {
       if (recording && params.has("immediateHotkey")) await emit("hotkey-recorded", params.get("immediateHotkey"));
       return null;
     case "test_hotkey_available":
+      if (args.hotkey === "Win+V") throw new Error("Win+V is reserved by Windows");
       if (recording && args.hotkey.startsWith("Win+")) throw new Error("recorder still owns this shortcut");
       return args.hotkey !== "Ctrl+Shift+X";
     case "trigger_registry_win_v_optimization": return params.get("winVChanged") === "true";
