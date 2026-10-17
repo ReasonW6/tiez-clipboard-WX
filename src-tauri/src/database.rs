@@ -453,6 +453,44 @@ mod tests {
     }
 
     #[test]
+    fn picked_tag_search_applies_keyword_before_the_result_limit() {
+        let repo = SqliteClipboardRepository::new(Arc::new(Mutex::new(setup_test_db())));
+        for index in 0..202 {
+            let content = if index == 0 || index == 201 { "needle" } else { "ordinary" };
+            let entry = ClipboardEntry {
+                id: 0, content_type: "text".into(), content: format!("{content}-{index}"),
+                html_content: None, source_app: "Test".into(), source_app_path: None,
+                timestamp: index, preview: content.into(), is_pinned: false,
+                tags: vec![if index == 201 { "Workshop" } else { "Work" }.into()],
+                use_count: 0, is_external: false, pinned_order: 0, file_preview_exists: true,
+            };
+            repo.save(&entry, None).unwrap();
+        }
+        let results = repo.search("needle", 200, false, Some("work")).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].content, "needle-0");
+        assert_eq!(repo.search("", 200, false, Some("Work")).unwrap().len(), 200);
+        assert!(repo.search("needle", 200, false, Some("missing")).unwrap().is_empty());
+    }
+
+    #[test]
+    fn picked_tag_search_also_filters_sensitive_entries() {
+        let repo = SqliteClipboardRepository::new(Arc::new(Mutex::new(setup_test_db())));
+        let entry = ClipboardEntry {
+            id: 0, content_type: "text".into(), content: "sensitive needle".into(),
+            html_content: None, source_app: "Test".into(), source_app_path: None,
+            timestamp: 1, preview: "sensitive needle".into(), is_pinned: false,
+            tags: vec!["密码".into()], use_count: 0, is_external: false,
+            pinned_order: 0, file_preview_exists: true,
+        };
+        repo.save(&entry, None).unwrap();
+        let results = repo.search("needle", 200, false, Some("密码")).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].content, entry.content);
+        assert!(repo.search("needle", 200, false, Some("Work")).unwrap().is_empty());
+    }
+
+    #[test]
     fn recapture_preserves_tags_and_survives_history_limit() {
         let conn = Arc::new(Mutex::new(setup_test_db()));
         let repo = SqliteClipboardRepository::new(conn.clone());

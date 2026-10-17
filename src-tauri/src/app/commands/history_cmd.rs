@@ -109,13 +109,19 @@ pub fn search_clipboard_history(
     search_term: String,
     limit: i32,
     tag_only: Option<bool>,
+    exact_tag: Option<String>,
 ) -> AppResult<Vec<ClipboardEntry>> {
     let is_tag_only = tag_only.unwrap_or(false);
-    let mut history = state.repo.search(&search_term, limit, is_tag_only)?;
+    let mut history = state.repo.search(&search_term, limit, is_tag_only, exact_tag.as_deref())?;
 
     let term = search_term.to_lowercase();
     let session_items = session.inner().0.lock().unwrap();
     for item in session_items.iter().rev() {
+        if let Some(tag) = &exact_tag {
+            if !item.tags.iter().any(|value| value.to_lowercase() == tag.to_lowercase()) {
+                continue;
+            }
+        }
         let matches = if is_tag_only {
             item.tags.iter().any(|t| t.to_lowercase().contains(&term))
         } else {

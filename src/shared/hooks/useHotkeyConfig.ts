@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { hotkeyIdentity } from "../lib/hotkeyIdentity";
 
 type HotkeyMode = "main" | "sequential" | "rich" | "search";
 
@@ -59,11 +60,12 @@ export const useHotkeyConfig = ({
 
   const checkHotkeyConflict = useCallback((newHotkey: string, target: HotkeyMode) => {
     if (!newHotkey) return false;
+    const matches = (configured: string) => hotkeyIdentity(newHotkey) === hotkeyIdentity(configured);
     const conflicts = [];
-    if (target !== "main" && newHotkey === hotkey) conflicts.push(t("global_hotkey"));
-    if (target !== "sequential" && sequentialMode && newHotkey === sequentialHotkey) conflicts.push(t("sequential_paste_hotkey_label"));
-    if (target !== "rich" && newHotkey === richPasteHotkey) conflicts.push(t("rich_paste_hotkey_label"));
-    if (target !== "search" && newHotkey === searchHotkey) conflicts.push(t("search_hotkey_label"));
+    if (target !== "main" && matches(hotkey)) conflicts.push(t("global_hotkey"));
+    if (target !== "sequential" && sequentialMode && matches(sequentialHotkey)) conflicts.push(t("sequential_paste_hotkey_label"));
+    if (target !== "rich" && matches(richPasteHotkey)) conflicts.push(t("rich_paste_hotkey_label"));
+    if (target !== "search" && matches(searchHotkey)) conflicts.push(t("search_hotkey_label"));
     if (!conflicts.length) return false;
     pushToast(t("hotkey_conflict_toast").replace("{name}", conflicts[0]), 5000);
     return true;
@@ -80,8 +82,8 @@ export const useHotkeyConfig = ({
         rich: { value: richPasteHotkey, set: setRichPasteHotkey, key: "rich_paste_hotkey", command: "set_rich_paste_hotkey" },
         search: { value: searchHotkey, set: setSearchHotkey, key: "search_hotkey", command: "set_search_hotkey" }
       }[target];
-      if (newHotkey === config.value) return true;
-      if (newHotkey && !await invoke<boolean>("test_hotkey_available", { hotkey: newHotkey })) {
+      if (hotkeyIdentity(newHotkey) === hotkeyIdentity(config.value)) return true;
+      if (newHotkey && !await invoke<boolean>("test_hotkey_available", { hotkey: newHotkey, currentHotkey: config.value })) {
         throw new Error(t("hotkey_unavailable"));
       }
       await invoke(config.command, { hotkey: newHotkey });

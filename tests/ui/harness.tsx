@@ -34,6 +34,7 @@ let savedTags = ["工作", "代码", "密码", "个人收藏", "一个很长的�
 let theme = "dark";
 let pinned = true;
 let recording = false;
+let focusRequestsCompleted = 0;
 const calls: {command: string; args: any}[] = [];
 const delays: Record<string, number> = {};
 const failures: Record<string, boolean> = {};
@@ -44,6 +45,10 @@ mockIPC(async (command, args: any = {}) => {
   calls.push({ command, args });
   switch (command) {
     case "get_settings": await pause(Number(params.get("settingsDelay") || "0")); return { ...settings };
+    case "focus_clipboard_window":
+      if (params.has("focusDelay")) await pause(Number(params.get("focusDelay")));
+      focusRequestsCompleted++;
+      return null;
     case "set_recording_mode":
       recording = args.enabled;
       if (recording && params.has("immediateHotkey")) await emit("hotkey-recorded", params.get("immediateHotkey"));
@@ -69,7 +74,9 @@ mockIPC(async (command, args: any = {}) => {
     case "plugin:app|version": return "0.3.4";
     case "get_clipboard_content": return entries.find(entry => entry.id === args.id)?.content;
     case "get_clipboard_history": return entries.slice(args.offset || 0, (args.offset || 0) + (args.limit || 80));
-    case "search_clipboard_history": return entries.filter(entry => (args.tagOnly ? entry.tags.join(" ") : entry.content).includes(args.searchTerm));
+    case "search_clipboard_history": return entries.filter(entry =>
+      (!args.exactTag || entry.tags.some(tag => tag.toLowerCase() === args.exactTag.toLowerCase())) &&
+      (args.tagOnly ? entry.tags.join(" ") : entry.content).includes(args.searchTerm)).slice(0, args.limit);
     case "get_all_tags": return savedTags;
     case "get_all_tags_info": return Object.fromEntries(savedTags.map(tag => [tag, entries.filter(e => e.tags.includes(tag)).length]));
     case "get_tag_colors": return { "工作": "#507ed9", "代码": "#9681ce", "密码": "#c37797" };
@@ -105,6 +112,7 @@ mockIPC(async (command, args: any = {}) => {
   }
 }, { shouldMockEvents: true });
 Object.assign(window, { testApp: { settings, calls, delays, failures, emit,
+  getFocusRequestsCompleted: () => focusRequestsCompleted,
   setContent: (id: number, content: string) => { const entry = entries.find(entry => entry.id === id)!; entry.content = content; },
   getEntries: () => structuredClone(entries), getTheme: () => theme } });
 localStorage.setItem("tiez_theme", settings["app.theme"]);

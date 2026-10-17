@@ -65,13 +65,14 @@ export const useHistoryFetch = ({
         const hasSearch = debouncedSearch && debouncedSearch.trim().length > 0;
 
         if (hasSearch) {
-          const { term, tagOnly } = backendSearch(debouncedSearch);
+          const { term, tagOnly, exactTag } = backendSearch(debouncedSearch);
 
           try {
             data = await invoke<ClipboardEntry[]>("search_clipboard_history", {
               searchTerm: term,
               limit: 200,
-              tagOnly
+              tagOnly,
+              exactTag
             });
           } catch (e) {
             console.error("Search failed, falling back", e);

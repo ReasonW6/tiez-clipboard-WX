@@ -15,25 +15,30 @@ interface HotkeyRecorderProps {
 export default function HotkeyRecorder({ hotkey, isRecording, setIsRecording, onRecord, t, disabled }: HotkeyRecorderProps) {
   const field = useRef<HTMLDivElement>(null);
   const captured = useRef(false);
+  const focusRequest = useRef(0);
   const tokens = getHotkeyDisplayTokens(hotkey);
   const label = tokens.map(token => token.label).join(isMacPlatform() ? " " : " + ");
 
-  useEffect(() => () => setIsRecording(false), [setIsRecording]);
-
   useEffect(() => {
-    if (!isRecording) return;
-    captured.current = false;
-    const cancel = () => setIsRecording(false);
+    const cancel = () => {
+      focusRequest.current++;
+      setIsRecording(false);
+    };
     const outside = (event: PointerEvent) => {
       if (!field.current?.contains(event.target as Node)) cancel();
     };
     window.addEventListener("blur", cancel);
     document.addEventListener("pointerdown", outside, true);
     return () => {
+      cancel();
       window.removeEventListener("blur", cancel);
       document.removeEventListener("pointerdown", outside, true);
     };
-  }, [isRecording, setIsRecording]);
+  }, [setIsRecording]);
+
+  useEffect(() => {
+    if (isRecording) captured.current = false;
+  }, [isRecording]);
 
   return <div
     ref={field}
@@ -44,15 +49,17 @@ export default function HotkeyRecorder({ hotkey, isRecording, setIsRecording, on
     onClick={async event => {
       if (disabled) return;
       const target = event.currentTarget;
+      const request = ++focusRequest.current;
       target.focus();
       try {
         await invoke("focus_clipboard_window");
-        if (target.isConnected && document.activeElement === target) setIsRecording(true);
+        if (request === focusRequest.current && target.isConnected && document.hasFocus()
+          && document.activeElement === target) setIsRecording(true);
       } catch (error) {
         console.error(error);
       }
     }}
-    onBlur={() => setIsRecording(false)}
+    onBlur={() => { focusRequest.current++; setIsRecording(false); }}
     onKeyDown={event => {
       if (!isRecording || captured.current || event.nativeEvent.isComposing) return;
       event.preventDefault();

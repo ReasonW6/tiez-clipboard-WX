@@ -15,12 +15,11 @@ export const parseSearch = (search: string): { tag: string | null; text: string 
   return { tag: null, text: search };
 };
 
-// What the backend is asked for. A picked tag narrows by tag; its typed text is
-// applied to those results by matchesSearch.
-export const backendSearch = (search: string): { term: string; tagOnly: boolean } => {
+// Apply both filters before the backend limits the result set.
+export const backendSearch = (search: string): { term: string; tagOnly: boolean; exactTag?: string } => {
   const { tag, text } = parseSearch(search);
-  if (tag !== null) return { term: tag, tagOnly: true };
-  return text.startsWith("tag:") ? { term: text.slice(4), tagOnly: true } : { term: text, tagOnly: false };
+  const query = text.startsWith("tag:") ? { term: text.slice(4), tagOnly: true } : { term: text, tagOnly: false };
+  return tag !== null ? { ...query, exactTag: tag } : query;
 };
 
 export const matchesSearch = (item: ClipboardEntry, search: string) => {

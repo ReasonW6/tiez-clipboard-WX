@@ -1,5 +1,29 @@
 import { test, expect } from "@playwright/test";
 
+test("picked-tag keyword search finds records older than the 200 newest tag matches", async ({ page }) => {
+  await page.route("**/tests/ui/harness.tsx*", async route => {
+    const response = await route.fetch();
+    const source = (await response.text()).replace("let savedTags =", `
+      entries = Array.from({ length: 201 }, (_, i) => ({ ...entries[0], id: i + 1,
+        content: i === 200 ? "needle-old-record" : "ordinary-" + i,
+        preview: i === 200 ? "needle-old-record" : "ordinary-" + i,
+        timestamp: Date.UTC(2026, 8, 14) - i * 60000, tags: ["工作"] }));
+      let savedTags =`);
+    await route.fulfill({ response, body: source });
+  });
+  await page.goto("/tests/ui/harness.html?theme=mica");
+  const input = page.locator(".search-input");
+  await input.fill("needle-old-record");
+  await expect(page.locator(".history-item")).toHaveCount(1);
+  await input.click();
+  await page.locator('.tags-dropdown .tag-chip[data-tag="工作"]').click();
+  await expect(page.locator(".search-tag-chip")).toHaveText("工作");
+  await expect.poll(() => page.evaluate(() => (window as any).testApp.calls.filter((call: any) =>
+    call.command === "search_clipboard_history").at(-1)?.args.exactTag)).toBe("工作");
+  await expect(page.locator(".history-item")).toHaveCount(1);
+  await expect(page.locator(".history-item")).toContainText("needle-old-record");
+});
+
 for (const theme of ["mica", "acrylic"]) for (const mode of ["light", "dark"]) {
   test(`${theme} ${mode}: the tag dropdown covers the type filters below it`, async ({ page }) => {
     await page.goto(`/tests/ui/harness.html?theme=${theme}&mode=${mode}`);

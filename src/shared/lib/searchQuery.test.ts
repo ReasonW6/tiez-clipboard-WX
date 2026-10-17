@@ -14,8 +14,10 @@ describe("search with a picked tag", () => {
     expect(parseSearch("tag:work")).toEqual({ tag: null, text: "tag:work" });
   });
 
-  it("asks the backend for the tag and filters its text locally", () => {
-    expect(backendSearch(searchWithTag("work", "report"))).toEqual({ term: "work", tagOnly: true });
+  it("asks the backend to filter both the exact tag and its text", () => {
+    expect(backendSearch(searchWithTag("work", "report"))).toEqual({ term: "report", tagOnly: false, exactTag: "work" });
+    expect(backendSearch(searchWithTag("work"))).toEqual({ term: "", tagOnly: false, exactTag: "work" });
+    expect(backendSearch(searchWithTag("work", "tag:urgent"))).toEqual({ term: "urgent", tagOnly: true, exactTag: "work" });
     expect(backendSearch("tag:wo")).toEqual({ term: "wo", tagOnly: true });
     expect(backendSearch("report")).toEqual({ term: "report", tagOnly: false });
   });

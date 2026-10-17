@@ -60,7 +60,7 @@ pub fn register_hotkey(app_handle: AppHandle, hotkey: String) -> AppResult<()> {
 }
 
 #[tauri::command]
-pub fn test_hotkey_available(app_handle: AppHandle, hotkey: String) -> AppResult<bool> {
+pub fn test_hotkey_available(app_handle: AppHandle, hotkey: String, current_hotkey: Option<String>) -> AppResult<bool> {
     if hotkey.is_empty()
         || hotkey.eq_ignore_ascii_case("MouseMiddle")
         || hotkey.eq_ignore_ascii_case("MButton")
@@ -75,7 +75,10 @@ pub fn test_hotkey_available(app_handle: AppHandle, hotkey: String) -> AppResult
 
     // Re-recording one of our own shortcuts must not unregister it during the probe.
     if app_handle.global_shortcut().is_registered(shortcut) {
-        return Ok(true);
+        if current_hotkey.and_then(|value| value.replace("Win", "Super").parse::<Shortcut>().ok()) == Some(shortcut) {
+            return Ok(true);
+        }
+        return Err(AppError::Validation("该快捷键已分配给其他功能".to_string()));
     }
 
     match app_handle.global_shortcut().register(shortcut.clone()) {

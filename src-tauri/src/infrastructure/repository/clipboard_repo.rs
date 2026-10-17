@@ -27,7 +27,7 @@ pub trait ClipboardRepository {
         offset: i32,
         content_type: Option<&str>,
     ) -> Result<Vec<ClipboardEntry>, String>;
-    fn search(&self, query: &str, limit: i32, tag_only: bool) -> Result<Vec<ClipboardEntry>, String>;
+    fn search(&self, query: &str, limit: i32, tag_only: bool, exact_tag: Option<&str>) -> Result<Vec<ClipboardEntry>, String>;
     fn delete(&self, id: i64, data_dir: Option<&std::path::Path>) -> Result<(), String>;
     fn clear(&self, data_dir: Option<&std::path::Path>) -> Result<(), String>;
     fn get_count(&self) -> Result<i64, String>;
@@ -881,11 +881,11 @@ impl ClipboardRepository for SqliteClipboardRepository {
         Ok(history)
     }
 
-    fn search(&self, query: &str, limit: i32, tag_only: bool) -> Result<Vec<ClipboardEntry>, String> {
+    fn search(&self, query: &str, limit: i32, tag_only: bool, exact_tag: Option<&str>) -> Result<Vec<ClipboardEntry>, String> {
         let conn = self.conn.lock().map_err(|e| e.to_string())?;
 
         let term = query.trim().to_lowercase();
-        if term.is_empty() {
+        if term.is_empty() && exact_tag.is_none() {
             return Ok(Vec::new());
         }
 
@@ -897,15 +897,17 @@ impl ClipboardRepository for SqliteClipboardRepository {
                  FROM clipboard_history ch
                  INNER JOIN entry_tags et ON ch.id = et.entry_id
                  WHERE et.tag LIKE '%' || ?1 || '%'
+                   AND (?3 IS NULL OR EXISTS (SELECT 1 FROM entry_tags picked WHERE picked.entry_id = ch.id AND picked.tag = ?3 COLLATE NOCASE))
                  ORDER BY ch.timestamp DESC
                  LIMIT ?2"
             } else {
                 "SELECT DISTINCT ch.id, ch.content_type, ch.content, ch.html_content, ch.source_app, ch.timestamp, ch.preview, ch.is_pinned, ch.tags, ch.use_count, ch.is_external, ch.pinned_order, ch.source_app_path
                  FROM clipboard_history ch
                  LEFT JOIN entry_tags et ON ch.id = et.entry_id
-                 WHERE ch.content LIKE '%' || ?1 || '%'
+                 WHERE (ch.content LIKE '%' || ?1 || '%'
                     OR ch.source_app LIKE '%' || ?1 || '%'
-                    OR et.tag LIKE '%' || ?1 || '%'
+                    OR et.tag LIKE '%' || ?1 || '%')
+                   AND (?3 IS NULL OR EXISTS (SELECT 1 FROM entry_tags picked WHERE picked.entry_id = ch.id AND picked.tag = ?3 COLLATE NOCASE))
                  ORDER BY ch.timestamp DESC
                  LIMIT ?2"
             };
@@ -913,7 +915,7 @@ impl ClipboardRepository for SqliteClipboardRepository {
             let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
 
             let rows = stmt
-                .query_map(params![term, limit], |row| {
+                .query_map(params![term, limit, exact_tag], |row| {
                     let tags_str: String =
                         row.get::<_, String>(8).unwrap_or_else(|_| "[]".to_string());
                     Ok(ClipboardEntry {
@@ -968,6 +970,7 @@ impl ClipboardRepository for SqliteClipboardRepository {
                            AND se.tag COLLATE NOCASE IN {}
                      )
                        AND et.tag LIKE '%' || ?1 || '%'
+                       AND (?3 IS NULL OR EXISTS (SELECT 1 FROM entry_tags picked WHERE picked.entry_id = ch.id AND picked.tag = ?3 COLLATE NOCASE))
                      ORDER BY ch.timestamp DESC, ch.id DESC
                      LIMIT ?2",
                     sensitive_tags_sql
@@ -987,6 +990,7 @@ impl ClipboardRepository for SqliteClipboardRepository {
                          OR ch.source_app LIKE '%' || ?1 || '%'
                          OR et.tag LIKE '%' || ?1 || '%'
                        )
+                       AND (?3 IS NULL OR EXISTS (SELECT 1 FROM entry_tags picked WHERE picked.entry_id = ch.id AND picked.tag = ?3 COLLATE NOCASE))
                      ORDER BY ch.timestamp DESC, ch.id DESC
                      LIMIT ?2",
                     sensitive_tags_sql
@@ -997,7 +1001,7 @@ impl ClipboardRepository for SqliteClipboardRepository {
                 .prepare(&sql_non_sensitive)
                 .map_err(|e| e.to_string())?;
             let rows = stmt
-                .query_map(params![term, limit], |row| {
+                .query_map(params![term, limit, exact_tag], |row| {
                     let tags_str: String = row.get(8).unwrap_or_else(|_| "[]".to_string());
                     let tags: Vec<String> = serde_json::from_str(&tags_str).unwrap_or_default();
                     let content_raw: String = row.get(2)?;
@@ -1053,6 +1057,7 @@ impl ClipboardRepository for SqliteClipboardRepository {
                          OR ch.preview LIKE ?1 
                          OR ch.html_content LIKE ?1
                      )
+                       AND (?5 IS NULL OR EXISTS (SELECT 1 FROM entry_tags picked WHERE picked.entry_id = ch.id AND picked.tag = ?5 COLLATE NOCASE))
                        AND ((ch.timestamp < ?2) OR (ch.timestamp = ?2 AND ch.id < ?3))
                      ORDER BY ch.timestamp DESC, ch.id DESC
                      LIMIT ?4",
@@ -1062,7 +1067,7 @@ impl ClipboardRepository for SqliteClipboardRepository {
                 loop {
                     let mut stmt = conn.prepare(&sql_sensitive).map_err(|e| e.to_string())?;
                     let rows = stmt
-                        .query_map(params![enc_like, cursor_ts, cursor_id, batch_size], |row| {
+                        .query_map(params![enc_like, cursor_ts, cursor_id, batch_size, exact_tag], |row| {
                             let tags_str: String = row.get(8).unwrap_or_else(|_| "[]".to_string());
                             Ok(ClipboardEntry {
                                 id: row.get(0)?,

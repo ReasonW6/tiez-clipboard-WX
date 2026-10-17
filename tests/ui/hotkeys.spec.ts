@@ -114,6 +114,27 @@ test("an unavailable shortcut keeps the saved shortcut", async ({ page }) => {
   await expect(page.locator(".key-group.recording")).toHaveCount(0);
 });
 
+test("modifier order cannot bypass the default rich paste shortcut conflict", async ({ page }) => {
+  await start(page);
+  await recorder(page).click();
+  await page.keyboard.press("Alt+Shift+V");
+  await expect(page.locator(".key-group.recording")).toHaveCount(0);
+  await expect(recorder(page)).toHaveText("Alt + V");
+  await expect(recorder(page, "带格式粘贴快捷键")).toHaveText("Alt + Shift + V");
+  expect(await page.evaluate(() => (window as any).testApp.calls.some((call: any) =>
+    call.command === "register_hotkey" && call.args.hotkey === "Shift+Alt+V"))).toBe(false);
+});
+
+test("blur cancels a recording start while its focus request is pending", async ({ page }) => {
+  await start(page, "focusDelay=250");
+  await recorder(page).click();
+  await page.evaluate(() => window.dispatchEvent(new Event("blur")));
+  await expect.poll(() => page.evaluate(() => (window as any).testApp.getFocusRequestsCompleted())).toBe(1);
+  await expect(page.locator(".key-group.recording")).toHaveCount(0);
+  expect(await page.evaluate(() => (window as any).testApp.calls.some((call: any) =>
+    call.command === "set_recording_mode" && call.args.enabled))).toBe(false);
+});
+
 test("Win+V restores a custom previous shortcut", async ({ page }) => {
   await start(page);
   await recorder(page).click();
