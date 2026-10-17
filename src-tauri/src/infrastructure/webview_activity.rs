@@ -15,11 +15,16 @@ use windows::core::Interface;
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
 use windows::Win32::UI::WindowsAndMessaging::{
-    IsWindowVisible, SWP_HIDEWINDOW, SWP_SHOWWINDOW, WINDOWPOS, WM_NCDESTROY, WM_WINDOWPOSCHANGED,
-    WM_WINDOWPOSCHANGING,
+    IsWindowVisible, KillTimer, SetTimer, SWP_HIDEWINDOW, SWP_SHOWWINDOW, WINDOWPOS, WM_NCDESTROY,
+    WM_TIMER, WM_WINDOWPOSCHANGED, WM_WINDOWPOSCHANGING,
 };
 
 const SUBCLASS_ID: usize = 0x5445_5a57;
+const SLEEP_TIMER_ID: usize = 0x5445_5a58;
+// Hiding resets the page (settings closed, search cleared). Its last painted
+// frame is what appears first when the window is shown again, so let it paint
+// that reset state, including the header's layout animation, before sleeping.
+const SLEEP_DELAY_MS: u32 = 600;
 
 thread_local! {
     // The controller and the subclass both live on the window's UI thread.
@@ -86,11 +91,21 @@ unsafe extern "system" fn subclass_proc(
         let flags = (*(lparam.0 as *const WINDOWPOS)).flags;
         // Wake before the window appears so the first visible frame is current.
         if msg == WM_WINDOWPOSCHANGING && flags.contains(SWP_SHOWWINDOW) {
+            let _ = KillTimer(Some(hwnd), SLEEP_TIMER_ID);
             set_active(true);
         }
         if msg == WM_WINDOWPOSCHANGED && flags.contains(SWP_HIDEWINDOW) {
+            if SetTimer(Some(hwnd), SLEEP_TIMER_ID, SLEEP_DELAY_MS, None) == 0 {
+                set_active(false);
+            }
+        }
+    }
+    if msg == WM_TIMER && wparam.0 == SLEEP_TIMER_ID {
+        let _ = KillTimer(Some(hwnd), SLEEP_TIMER_ID);
+        if !IsWindowVisible(hwnd).as_bool() {
             set_active(false);
         }
+        return LRESULT(0);
     }
     if msg == WM_NCDESTROY {
         let _ = RemoveWindowSubclass(hwnd, Some(subclass_proc), SUBCLASS_ID);
