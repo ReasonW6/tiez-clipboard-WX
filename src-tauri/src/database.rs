@@ -301,10 +301,6 @@ pub fn seed_defaults(conn: &Connection) -> Result<()> {
         "INSERT OR IGNORE INTO settings (key, value) VALUES ('app.surface_opacity', '50')",
         [],
     );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('app.notice_v028_shown', 'true')",
-        [],
-    );
 
     // Storage limit settings
     let _ = conn.execute(
