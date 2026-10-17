@@ -45,12 +45,6 @@ export const THEMES: ThemeDefinition[] = [
     supportsSurfaceOpacity: true
   },
   {
-    id: "liquid-glass",
-    labels: { zh: "液态玻璃", en: "Liquid Glass", tw: "液態玻璃" },
-    supportsCustomBackground: true,
-    supportsSurfaceOpacity: true
-  },
-  {
     id: "paper",
     labels: {
       zh: "纸质书感",

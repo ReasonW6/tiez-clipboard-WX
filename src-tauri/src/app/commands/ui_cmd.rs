@@ -136,7 +136,7 @@ pub fn set_theme(
             // Toggle native DWM border visibility while preserving the window frame/corners.
             const DWMWA_COLOR_DEFAULT: u32 = 0xFFFFFFFF;
             const DWMWA_COLOR_NONE: u32 = 0xFFFFFFFE;
-            let border_color: u32 = if show_border && theme != "liquid-glass" {
+            let border_color: u32 = if show_border {
                 DWMWA_COLOR_DEFAULT
             } else {
                 DWMWA_COLOR_NONE
@@ -162,10 +162,8 @@ pub fn set_theme(
         let is_win10 = build >= 10240 && build < 22000;
 
         let opacity = surface_opacity.or_else(|| db_state.settings_repo.get("app.surface_opacity").ok().flatten().and_then(|value| value.parse().ok())).unwrap_or(50.0);
-        // Undecorated shadows reserve a non-client inset in Tao. A glass
-        // client surface cannot cover it; configure the frame before capture.
-        let _ = window.set_shadow(show_border && is_win11 && !is_win10 && theme != "liquid-glass");
-        crate::infrastructure::window_material::apply(&window, &theme, is_dark, opacity)
+        let _ = window.set_shadow(show_border && is_win11 && !is_win10);
+        crate::infrastructure::window_material::apply(&window, &theme, opacity)
             .map_err(AppError::Internal)?;
     }
 
@@ -178,7 +176,7 @@ pub fn set_theme(
         };
 
         let _ = window_vibrancy::clear_vibrancy(&window);
-        if matches!(theme.as_str(), "mica" | "acrylic" | "liquid-glass") {
+        if matches!(theme.as_str(), "mica" | "acrylic") {
             let _ = window_vibrancy::apply_vibrancy(
                 &window,
                 window_vibrancy::NSVisualEffectMaterial::HudWindow,
@@ -197,35 +195,4 @@ pub fn set_material_opacity(window: WebviewWindow, opacity: f64) -> AppResult<()
     #[cfg(target_os = "windows")]
     crate::infrastructure::window_material::set_opacity(&window, opacity).map_err(AppError::Internal)?;
     Ok(())
-}
-
-#[tauri::command]
-pub fn set_glass_geometry(window: WebviewWindow, geometry: serde_json::Value) -> AppResult<u64> {
-    #[cfg(target_os = "windows")]
-    {
-        let geometry = serde_json::from_value(geometry)
-            .map_err(|error| AppError::Internal(format!("Invalid glass geometry: {error}")))?;
-        crate::infrastructure::window_material::submit_geometry(&window, geometry)
-            .map_err(AppError::Internal)
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        let _ = (window, geometry);
-        Ok(0)
-    }
-}
-
-#[tauri::command]
-pub fn get_native_glass_status(window: WebviewWindow) -> AppResult<serde_json::Value> {
-    #[cfg(target_os = "windows")]
-    {
-        let status = crate::infrastructure::window_material::native_glass_status(&window)
-            .map_err(AppError::Internal)?;
-        serde_json::to_value(status).map_err(|error| AppError::Internal(error.to_string()))
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        let _ = window;
-        Ok(serde_json::json!({ "state": "inactive", "revision": 0, "geometryRevision": 0 }))
-    }
 }

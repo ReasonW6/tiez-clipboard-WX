@@ -1,16 +1,10 @@
-import GlassLens from "../../../shared/components/GlassLens";
-import "../../../styles/themes/liquid-glass-filter.css";
-
 const TYPES = ["text", "image", "file", "url", "code", "video", "rich_text"];
 
-export default function ClipboardTypeFilter({ theme, value, onChange, label }: {
-  theme: string;
+export default function ClipboardTypeFilter({ value, onChange, label }: {
   value: string | null;
   onChange: (value: string | null) => void;
   label: (type: string) => string;
 }) {
-  const liquid = theme === "liquid-glass";
-
   return <div className="type-filter-scroll hide-scrollbar" onWheel={event => {
     if (event.deltaY !== 0) event.currentTarget.scrollLeft += event.deltaY;
   }}>
@@ -22,7 +16,7 @@ export default function ClipboardTypeFilter({ theme, value, onChange, label }: {
         aria-pressed={value === type}
         onClick={() => onChange(value === type ? null : type)}
         title={label(type)}
-      >{liquid && <GlassLens radius={16} />}<span className="type-filter-label">{label(type)}</span></button>)}
+      ><span className="type-filter-label">{label(type)}</span></button>)}
     </div>
   </div>;
 }

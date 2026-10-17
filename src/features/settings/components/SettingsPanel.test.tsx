@@ -35,7 +35,7 @@ describe("local settings", () => {
     expect(html).toContain("appearance_settings");
     expect(html).toContain("default_apps");
     expect(html).toContain("check_update");
-    expect(html.match(/class="theme-choice-title"/g)).toHaveLength(7);
+    expect(html.match(/class="theme-choice-title"/g)).toHaveLength(6);
     for (const retired of ["ai_settings", "cloud_sync", "file_transfer", "mqtt", "theme_store"]) {
       expect(html).not.toContain(retired);
     }

@@ -17,7 +17,6 @@ export const clampSurfaceOpacity = (value: number) => Number.isFinite(value)
 export const getMaterialSurfaces = (opacity: number, theme = DEFAULT_THEME) => {
   const density = clampSurfaceOpacity(opacity) / 100;
   const profiles: Record<string, { minFill: number; maxFill: number; minBlur: number; maxBlur: number }> = {
-    "liquid-glass": { minFill: .74, maxFill: .90, minBlur: 1.5, maxBlur: 16 },
     acrylic: { minFill: .74, maxFill: .90, minBlur: 18, maxBlur: 38 },
     mica: { minFill: .86, maxFill: .98, minBlur: 32, maxBlur: 56 }
   };

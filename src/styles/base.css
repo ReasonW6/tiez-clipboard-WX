@@ -352,12 +352,12 @@ body.hide-app-border #root {
 
 /* DWM clips the complete Win11 window, including its native backdrop. Filling
    that rectangle avoids exposing crescents between two different corner radii. */
-:root.native-window-frame:is(.theme-mica, .theme-acrylic, .theme-liquid-glass, .theme-sakura),
-body.native-window-frame:is(.theme-mica, .theme-acrylic, .theme-liquid-glass, .theme-sakura) {
+:root.native-window-frame:is(.theme-mica, .theme-acrylic, .theme-sakura),
+body.native-window-frame:is(.theme-mica, .theme-acrylic, .theme-sakura) {
   --shell-radius: 0px !important;
 }
-body.native-window-frame:is(.theme-mica, .theme-acrylic, .theme-liquid-glass, .theme-sakura) #root { border: 0; }
-body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass, .theme-sakura) .app-container {
+body.native-window-frame:is(.theme-mica, .theme-acrylic, .theme-sakura) #root { border: 0; }
+body:is(.theme-mica, .theme-acrylic, .theme-sakura) .app-container {
   border-radius: max(0px, calc(var(--shell-radius) - 1px));
   -webkit-clip-path: none;
   clip-path: none;

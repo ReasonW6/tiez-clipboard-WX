@@ -1,10 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { writeFile } from "node:fs/promises";
 
-for (const theme of ["liquid-glass", "mica", "acrylic"]) for (const mode of ["light", "dark"] as const) {
+for (const theme of ["mica", "acrylic"]) for (const mode of ["light", "dark"] as const) {
   test(`${theme} footer ink follows a ${mode} palette change on its first frame`, async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "no-preference" });
-    await page.goto(`/tests/ui/harness.html?theme=${theme}&mode=${mode}&nativeGlass=true`);
+    await page.goto(`/tests/ui/harness.html?theme=${theme}&mode=${mode}`);
     await page.getByTitle("设置", { exact: true }).click();
     await expect(page.getByText("问题反馈", { exact: true })).toBeVisible();
     await expect(page.locator(".settings-view")).toHaveCSS("opacity", "1");

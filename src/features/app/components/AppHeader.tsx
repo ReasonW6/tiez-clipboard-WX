@@ -14,7 +14,6 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { getTagColor, getTagTextColor } from "../../../shared/lib/utils";
 import ClipboardTypeFilter from "./ClipboardTypeFilter";
-import GlassLens from "../../../shared/components/GlassLens";
 
 // Release the inline transform after projection so each theme keeps its CSS hover motion.
 const buttonTransform = (_values: unknown, transform: string) => transform === "none" ? "" : transform;
@@ -115,7 +114,6 @@ const AppHeader = ({
       <div className="header-leading">
         {(showSettings || showTagManager || showEmojiPanel) && (
           <button className="btn-icon header-back window-no-drag" aria-label={t('back')} onClick={onBack}>
-            {theme === "liquid-glass" && <GlassLens radius={16} />}
             <ChevronLeft size={18} />
           </button>
         )}
@@ -132,7 +130,6 @@ const AppHeader = ({
         </div>
       </div>
       <motion.div layout className="header-actions window-no-drag">
-        {theme === "liquid-glass" && <GlassLens />}
         {/* Pin Button - Always visible but single instance */}
         <motion.button layout="position" transformTemplate={buttonTransform}
           className={`btn-icon ${isWindowPinned ? 'active' : ''}`}
@@ -186,8 +183,7 @@ const AppHeader = ({
             style={{ flexShrink: 0 }}
           >
             <div className="search-container window-no-drag">
-              <div className={theme === 'liquid-glass' ? 'liquid-search' : undefined} style={{ position: 'relative' }}>
-                {theme === 'liquid-glass' && <GlassLens />}
+              <div style={{ position: 'relative' }}>
                 <Search size={14} className="search-icon" />
                 <input
                   ref={searchInputRef}
@@ -238,7 +234,7 @@ const AppHeader = ({
                             }}
                             data-tag={tag}
                             style={{ background: tagBackground, color: getTagTextColor(tagBackground, theme),
-                              filter: ["mica", "acrylic", "liquid-glass"].includes(theme) ? "none" : undefined }}
+                              filter: ["mica", "acrylic"].includes(theme) ? "none" : undefined }}
                           >
                             {tag}
                           </span>
@@ -248,7 +244,7 @@ const AppHeader = ({
                   </div>
                 )}
               </div>
-              <ClipboardTypeFilter theme={theme} value={typeFilter} onChange={setTypeFilter} label={getTypeName} />
+              <ClipboardTypeFilter value={typeFilter} onChange={setTypeFilter} label={getTypeName} />
 
             </div>
           </motion.div>

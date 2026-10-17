@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { writeFile } from "node:fs/promises";
 
-for (const theme of ["liquid-glass", "mica", "acrylic"]) {
+for (const theme of ["mica", "acrylic"]) {
   test(`settings headings change ink together with the color mode: ${theme}`, async ({ page }) => {
     await page.goto(`/tests/ui/harness.html?theme=${theme}&mode=light&opacity=0`);
     await page.getByTitle("设置", { exact: true }).click();
@@ -50,7 +50,7 @@ for (const theme of ["liquid-glass", "mica", "acrylic"]) {
   });
 }
 
-for (const theme of ["liquid-glass", "mica", "acrylic"]) for (const mode of ["light", "dark"]) {
+for (const theme of ["mica", "acrylic"]) for (const mode of ["light", "dark"]) {
   test(`pin control remains readable throughout state changes: ${theme} ${mode}`, async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "no-preference" });
     await page.goto(`/tests/ui/harness.html?theme=${theme}&mode=${mode}&opacity=0`);

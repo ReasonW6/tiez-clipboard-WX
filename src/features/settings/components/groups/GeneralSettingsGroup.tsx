@@ -1,5 +1,3 @@
-import SettingsGlassField from "../SettingsGlassField";
-import GlassLens from "../../../../shared/components/GlassLens";
 import type { ComponentType, ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ChevronDown, ChevronRight } from "lucide-react";
@@ -14,7 +12,6 @@ interface LabelWithHintProps {
 }
 
 interface GeneralSettingsGroupProps {
-    theme: string;
     t: (key: string) => string;
     collapsed: boolean;
     onToggle: () => void;
@@ -48,7 +45,7 @@ interface GeneralSettingsGroupProps {
     saveAppSetting: (key: string, val: string) => void;
 }
 
-const GeneralSettingsGroup = ({ theme,
+const GeneralSettingsGroup = ({
     t,
     collapsed,
     onToggle,
@@ -82,7 +79,7 @@ const GeneralSettingsGroup = ({ theme,
     saveAppSetting
 }: GeneralSettingsGroupProps) => (
     <div className={`settings-group ${collapsed ? 'collapsed' : ''}`}>
-        <div className="group-header" onClick={onToggle}>{theme === "liquid-glass" && <GlassLens radius={12} />}
+        <div className="group-header" onClick={onToggle}>
             <h3 style={{ margin: 0 }}>{t('general_settings')}</h3>
             {collapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
         </div>
@@ -103,7 +100,7 @@ const GeneralSettingsGroup = ({ theme,
                                 invoke("toggle_autostart", { enabled }).catch(console.error);
                             }}
                         />
-                        <div className="toggle">{theme === "liquid-glass" && <GlassLens radius={12} />}<div className="left" /><div className="right" /></div>
+                        <div className="toggle"><div className="left" /><div className="right" /></div>
                     </label>
                 </div>
 
@@ -122,7 +119,7 @@ const GeneralSettingsGroup = ({ theme,
                                 invoke("set_tray_visible", { visible: !val }).catch(console.error);
                             }}
                         />
-                        <div className="toggle">{theme === "liquid-glass" && <GlassLens radius={12} />}<div className="left" /><div className="right" /></div>
+                        <div className="toggle"><div className="left" /><div className="right" /></div>
                     </label>
                 </div>
 
@@ -144,7 +141,7 @@ const GeneralSettingsGroup = ({ theme,
                                     invoke("set_dock_visible", { visible: !val }).catch(console.error);
                                 }}
                             />
-                            <div className="toggle">{theme === "liquid-glass" && <GlassLens radius={12} />}<div className="left" /><div className="right" /></div>
+                            <div className="toggle"><div className="left" /><div className="right" /></div>
                         </label>
                     </div>
                 )}
@@ -166,7 +163,7 @@ const GeneralSettingsGroup = ({ theme,
                                 invoke("set_edge_docking", { enabled: val }).catch(console.error);
                             }}
                         />
-                        <div className="toggle">{theme === "liquid-glass" && <GlassLens radius={12} />}<div className="left" /><div className="right" /></div>
+                        <div className="toggle"><div className="left" /><div className="right" /></div>
                     </label>
                 </div>
 
@@ -186,7 +183,7 @@ const GeneralSettingsGroup = ({ theme,
                                 invoke("set_sound_enabled", { enabled }).catch(console.error);
                             }}
                         />
-                        <div className="toggle">{theme === "liquid-glass" && <GlassLens radius={12} />}<div className="left" /><div className="right" /></div>
+                        <div className="toggle"><div className="left" /><div className="right" /></div>
                     </label>
                 </div>
                 {soundEnabled && (
@@ -205,7 +202,7 @@ const GeneralSettingsGroup = ({ theme,
                                     invoke("save_setting", { key: 'app.sound_paste_enabled', value: String(enabled) }).catch(console.error);
                                 }}
                             />
-                            <div className="toggle">{theme === "liquid-glass" && <GlassLens radius={12} />}<div className="left" /><div className="right" /></div>
+                            <div className="toggle"><div className="left" /><div className="right" /></div>
                         </label>
                     </div>
                 )}
@@ -215,7 +212,7 @@ const GeneralSettingsGroup = ({ theme,
                             <span className="item-label">{t('sound_volume') || "Sound Volume"} ({Math.round(soundVolume * 100)}%)</span>
                         </div>
                         <div style={{ padding: '0 4px', width: '100%' }}>
-                            <SettingsGlassField theme={theme}><input
+                            <input
                                 type="range"
                                 min="0"
                                 max="1"
@@ -228,7 +225,7 @@ const GeneralSettingsGroup = ({ theme,
                                 style={{
                                     ['--range-progress' as any]: `${soundVolume * 100}%`
                                 }}
-                            /></SettingsGlassField>
+                            />
                         </div>
                     </div>
                 )}
@@ -251,7 +248,7 @@ const GeneralSettingsGroup = ({ theme,
                                 invoke("set_silent_start", { enabled }).catch(console.error);
                             }}
                         />
-                        <div className="toggle">{theme === "liquid-glass" && <GlassLens radius={12} />}<div className="left" /><div className="right" /></div>
+                        <div className="toggle"><div className="left" /><div className="right" /></div>
                     </label>
                 </div>
                 <div className="setting-item">
@@ -271,7 +268,7 @@ const GeneralSettingsGroup = ({ theme,
                                 saveAppSetting('show_search_box', String(enabled));
                             }}
                         />
-                        <div className="toggle">{theme === "liquid-glass" && <GlassLens radius={12} />}<div className="left" /><div className="right" /></div>
+                        <div className="toggle"><div className="left" /><div className="right" /></div>
                     </label>
                 </div>
                 <div className="setting-item">
@@ -291,7 +288,7 @@ const GeneralSettingsGroup = ({ theme,
                                 saveAppSetting('show_scroll_top_button', String(enabled));
                             }}
                         />
-                        <div className="toggle">{theme === "liquid-glass" && <GlassLens radius={12} />}<div className="left" /><div className="right" /></div>
+                        <div className="toggle"><div className="left" /><div className="right" /></div>
                     </label>
                 </div>
                 <div className="setting-item">
@@ -311,7 +308,7 @@ const GeneralSettingsGroup = ({ theme,
                                 saveAppSetting('emoji_panel_enabled', String(enabled));
                             }}
                         />
-                        <div className="toggle">{theme === "liquid-glass" && <GlassLens radius={12} />}<div className="left" /><div className="right" /></div>
+                        <div className="toggle"><div className="left" /><div className="right" /></div>
                     </label>
                 </div>
                 <div className="setting-item">
@@ -331,7 +328,7 @@ const GeneralSettingsGroup = ({ theme,
                                 saveAppSetting('tag_manager_enabled', String(enabled));
                             }}
                         />
-                        <div className="toggle">{theme === "liquid-glass" && <GlassLens radius={12} />}<div className="left" /><div className="right" /></div>
+                        <div className="toggle"><div className="left" /><div className="right" /></div>
                     </label>
                 </div>
                 <div className="setting-item">
@@ -351,7 +348,7 @@ const GeneralSettingsGroup = ({ theme,
                                 saveAppSetting('arrow_key_selection', String(enabled));
                             }}
                         />
-                        <div className="toggle">{theme === "liquid-glass" && <GlassLens radius={12} />}<div className="left" /><div className="right" /></div>
+                        <div className="toggle"><div className="left" /><div className="right" /></div>
                     </label>
                 </div>
 

@@ -1,19 +1,17 @@
-import GlassLens from "../../../../shared/components/GlassLens";
 import { open, ask, message } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
 interface DataSettingsGroupProps {
-    theme: string;
     t: (key: string) => string;
     collapsed: boolean;
     onToggle: () => void;
     dataPath: string;
 }
 
-const DataSettingsGroup = ({ theme, t, collapsed, onToggle, dataPath }: DataSettingsGroupProps) => (
+const DataSettingsGroup = ({ t, collapsed, onToggle, dataPath }: DataSettingsGroupProps) => (
     <div className={`settings-group ${collapsed ? 'collapsed' : ''}`}>
-        <div className="group-header" onClick={onToggle}>{theme === "liquid-glass" && <GlassLens radius={12} />}
+        <div className="group-header" onClick={onToggle}>
             <h3 style={{ margin: 0 }}>{t('data_management')}</h3>
             {collapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
         </div>
@@ -67,7 +65,7 @@ const DataSettingsGroup = ({ theme, t, collapsed, onToggle, dataPath }: DataSett
                                     });
                                 }}
                                 style={{ width: 'auto', padding: '4px 12px', fontSize: '10px', textTransform: 'uppercase', height: '24px' }}
-                            >{theme === "liquid-glass" && <GlassLens radius={12} />}
+                            >
                                 {t('change_app')}
                             </button>
                             <button
@@ -75,12 +73,12 @@ const DataSettingsGroup = ({ theme, t, collapsed, onToggle, dataPath }: DataSett
                                 onClick={() => invoke("open_data_folder").catch(console.error)}
                                 title={t('open_folder') || "Open"}
                                 style={{ width: 'auto', padding: '4px 12px', fontSize: '10px', textTransform: 'uppercase', height: '24px' }}
-                            >{theme === "liquid-glass" && <GlassLens radius={12} />}
+                            >
                                 {t('open_folder')}
                             </button>
                         </div>
                     </div>
-                    <div className="data-panel" style={{ fontSize: '11px', color: 'var(--text-secondary)', wordBreak: 'break-all' }}>{theme === "liquid-glass" && <GlassLens radius={12} />}
+                    <div className="data-panel" style={{ fontSize: '11px', color: 'var(--text-secondary)', wordBreak: 'break-all' }}>
                         <span className="settings-data-text">{dataPath}</span>
                     </div>
                 </div>

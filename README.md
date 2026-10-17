@@ -23,7 +23,7 @@
 
 ## Theme Gallery
 
-Explore 7 built-in themes designed for different workspaces and workflows.
+Explore 6 built-in themes designed for different workspaces and workflows.
 
   <table>
     <tr>
@@ -36,7 +36,6 @@ Explore 7 built-in themes designed for different workspaces and workflows.
   <table>
     <tr>
       <td align="center"><b>Mica</b><br><img src="docs/images/mica.png" width="220" /></td>
-      <td align="center"><b>Liquid Glass</b><br><img src="docs/images/liquid-glass.png" width="220" /></td>
       <td align="center"><b>Sakura</b><br><img src="docs/images/sakura.png" width="220" /></td>
     </tr>
   </table>
@@ -48,7 +47,7 @@ Explore 7 built-in themes designed for different workspaces and workflows.
 
 | Performance | Practicality | Privacy | Appearance |
 | :--- | :--- | :--- | :--- |
-| **Instant Access**<br>Native listeners and a Rust core for quick access to your clipboard. | **Power Workflows**<br>Rich text, multi-color tags, search, and sequential paste. | **Local & Private**<br>Local history storage with masking for sensitive data in previews. | **Make It Yours**<br>Seven built-in themes, light and dark modes, and adjustable Liquid Glass effects. |
+| **Instant Access**<br>Native listeners and a Rust core for quick access to your clipboard. | **Power Workflows**<br>Rich text, multi-color tags, search, and sequential paste. | **Local & Private**<br>Local history storage with masking for sensitive data in previews. | **Make It Yours**<br>Six built-in themes, light and dark modes, and adjustable material transparency. |
 
 ---
 
@@ -58,8 +57,8 @@ Explore 7 built-in themes designed for different workspaces and workflows.
 
 - **Native Efficiency**: Built with Tauri 2 and Rust for minimum memory footprint.
 - **Smart Capture**: Automatically collects text, rich text (HTML), images, and file paths.
-- **Modern UI**: **7 built-in themes**, including refreshed Mica/Acrylic effects and Liquid Glass, with light and dark modes.
-- **Liquid Glass Controls**: One transparency slider (0–100%) smoothly adjusts the material while keeping text readable.
+- **Modern UI**: **6 built-in themes**, including refreshed Mica/Acrylic effects, with light and dark modes.
+- **Material Controls**: One transparency slider (0–100%) smoothly adjusts the material while keeping text readable.
 - **Edge Docking**: Automatically hides at the screen edge to stay out of your way.
 
 ### Management & Enhancements

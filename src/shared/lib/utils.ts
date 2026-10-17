@@ -59,7 +59,7 @@ export const getTagColor = (tag: string, theme: string) => {
 };
 
 export const getTagTextColor = (backgroundColor: string, theme?: string) => {
-  if (theme !== "mica" && theme !== "acrylic" && theme !== "liquid-glass") return "#ffffff";
+  if (theme !== "mica" && theme !== "acrylic") return "#ffffff";
 
   // Tags use opaque HEX from the color picker or the HSL generated above.
   // Other CSS colors can depend on the backdrop; retain their existing ink.

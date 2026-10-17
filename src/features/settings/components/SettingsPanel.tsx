@@ -1,4 +1,3 @@
-import GlassLens from "../../../shared/components/GlassLens";
 
 import { memo, useState, useEffect, useCallback } from "react";
 import { getVersion } from "@tauri-apps/api/app";
@@ -210,7 +209,7 @@ const SettingsPanel = (props: SettingsPanelProps) => {
                             e.stopPropagation();
                             toggleHint(hintKey);
                         }}
-                    >{theme === "liquid-glass" && <GlassLens radius={12} />}
+                    >
                         <HelpCircle size={12} />
                     </button>
                 )}
@@ -242,7 +241,6 @@ const SettingsPanel = (props: SettingsPanelProps) => {
             {settingsSubpage === "advanced" ? (
                 <>
                     <AdvancedSettingsGroup
-                theme={theme}
                         t={t}
                         cleanupRules={cleanupRules}
                         setCleanupRules={setCleanupRules}
@@ -267,7 +265,6 @@ const SettingsPanel = (props: SettingsPanelProps) => {
                 <>
             {/* General Settings */}
             <GeneralSettingsGroup
-                theme={theme}
                 t={t}
                 collapsed={collapsedGroups['general']}
                 onToggle={() => toggleGroup('general')}
@@ -404,7 +401,6 @@ const SettingsPanel = (props: SettingsPanelProps) => {
 
             {/* Default Apps Settings */}
             <DefaultAppsSettingsGroup
-                theme={theme}
                 t={t}
                 collapsed={collapsedGroups['default_apps']}
                 onToggle={() => toggleGroup('default_apps')}
@@ -416,7 +412,6 @@ const SettingsPanel = (props: SettingsPanelProps) => {
 
             {/* Data Management Settings */}
             <DataSettingsGroup
-                theme={theme}
                 t={t}
                 collapsed={collapsedGroups['data']}
                 onToggle={() => toggleGroup('data')}
@@ -428,7 +423,7 @@ const SettingsPanel = (props: SettingsPanelProps) => {
                     type="button"
                     className="group-header settings-nav-card"
                     onClick={openAdvancedSettingsWindow}
-                >{theme === "liquid-glass" && <GlassLens radius={12} />}
+                >
                     <div style={{ minWidth: 0, textAlign: "left" }}>
                         <h3 style={{ margin: 0 }}>{t("advanced_settings")}</h3>
                         <div className="settings-subpage-note">{t("advanced_settings_entry_desc")}</div>

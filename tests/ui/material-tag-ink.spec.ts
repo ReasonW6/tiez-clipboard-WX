@@ -14,7 +14,7 @@ async function readChip(chip: Locator) {
 }
 
 test("material tag ink covers generated HSL and opaque color-picker HEX", async ({ page }) => {
-  await page.goto("/tests/ui/harness.html?theme=liquid-glass&mode=light&opacity=0");
+  await page.goto("/tests/ui/harness.html?theme=mica&mode=light&opacity=0");
   const result = await page.evaluate(async () => {
     const path = "/src/shared/lib/utils.ts";
     const { getTagColor, getTagTextColor } = await import(path);
@@ -31,16 +31,16 @@ test("material tag ink covers generated HSL and opaque color-picker HEX", async 
       const ink = luminance(css.color), paper = luminance(css.backgroundColor);
       return { background, color: css.color, ratio: (Math.max(ink, paper) + .05) / (Math.min(ink, paper) + .05) };
     };
-    const samples = [getTagColor("测试", "liquid-glass"), "#507ed9", "#9681ce", "#c37797",
+    const samples = [getTagColor("测试", "mica"), "#507ed9", "#9681ce", "#c37797",
       "#000000", "#ffffff", "#747474", "#757575", "#777777", "#090", "#fff",
       ...Array.from({ length: 360 }, (_, hue) => `hsl(${hue}, 76%, 62%)`),
       ...Array.from({ length: 256 }, (_, value) => `#${value.toString(16).padStart(2, "0").repeat(3)}`)];
-    const materials = ["mica", "acrylic", "liquid-glass"].map(theme => ({ theme,
+    const materials = ["mica", "acrylic"].map(theme => ({ theme,
       worst: samples.map(background => measure(background, theme)).sort((a, b) => a.ratio - b.ratio)[0] }));
-    const originalFailure = measure(getTagColor("测试", "liquid-glass"), "liquid-glass");
+    const originalFailure = measure(getTagColor("测试", "mica"), "mica");
     const unchanged = ["paper", "retro", "sakura", "sticky-note", "unknown"].map(theme => measure("#ffffff", theme).color);
     const unsupported = ["transparent", "var(--tag)", "rgba(0, 0, 0, .5)", "#0008", "hsl(0, 100%, 50%, .5)"]
-      .map(background => getTagTextColor(background, "liquid-glass"));
+      .map(background => getTagTextColor(background, "mica"));
     chip.remove();
     return { materials, originalFailure, unchanged, unsupported };
   });
@@ -51,7 +51,7 @@ test("material tag ink covers generated HSL and opaque color-picker HEX", async 
   expect(result.unsupported).toEqual(Array(5).fill("#ffffff"));
 });
 
-for (const theme of ["mica", "acrylic", "liquid-glass"]) {
+for (const theme of ["mica", "acrylic"]) {
   test(`${theme}: all three tag call sites retain readable ink at both endpoints`, async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     for (const mode of ["light", "dark"]) for (const opacity of [0, 100]) {

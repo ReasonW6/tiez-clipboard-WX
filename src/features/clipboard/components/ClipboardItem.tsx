@@ -36,7 +36,6 @@ import {
     getTagTextColor
 } from "../../../shared/lib/utils";
 import HtmlContent from "../../../shared/components/HtmlContent";
-import GlassLens from "../../../shared/components/GlassLens";
 import { toTauriLocalImageSrc } from "../../../shared/lib/localImageSrc";
 import { getRichTextSnapshotDataUrl } from "../../../shared/lib/richTextSnapshot";
 import { getFileIcon as getSystemFileIcon, peekFileIcon } from "../../../shared/lib/fileIcon";
@@ -1278,7 +1277,7 @@ const ClipboardItem = ({
                         style={{
                             background: tagBackground,
                             color: tagTextColor,
-                            filter: ["mica", "acrylic", "liquid-glass"].includes(theme) ? "none" : undefined,
+                            filter: ["mica", "acrylic"].includes(theme) ? "none" : undefined,
                             display: 'flex',
                             alignItems: 'center',
                             gap: '4px'
@@ -1571,7 +1570,6 @@ const ClipboardItem = ({
                 void hideCompactPreview();
             }}
         >
-            {theme === "liquid-glass" && <GlassLens radius={16} material="regular" />}
             <div className="item-meta">
                 <div className="item-meta-left">
                     {dragControls && (

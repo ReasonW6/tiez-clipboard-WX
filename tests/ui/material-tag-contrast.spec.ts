@@ -29,7 +29,7 @@ async function contrast(page: Page, selector: string) {
   }, pseudo);
 }
 
-for (const theme of ["mica", "acrylic", "liquid-glass"]) {
+for (const theme of ["mica", "acrylic"]) {
   for (const mode of ["light", "dark"]) {
     test(`${theme} ${mode}: tag controls remain legible at both transparency endpoints`, async ({ page }) => {
       await page.emulateMedia({ reducedMotion: "reduce" });

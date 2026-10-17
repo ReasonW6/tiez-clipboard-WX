@@ -106,8 +106,6 @@ fn main() {
             app::commands::relaunch,
             app::commands::set_theme,
             app::commands::set_material_opacity,
-            app::commands::set_glass_geometry,
-            app::commands::get_native_glass_status,
             app::commands::get_platform_info,
             app::commands::send_system_notification,
             app::commands::register_hotkey,

@@ -2,11 +2,10 @@ import { expect, it } from "vitest";
 import materialCss from "../../styles/themes/materials.css?raw";
 import micaCss from "../../styles/themes/mica.css?raw";
 import acrylicCss from "../../styles/themes/acrylic.css?raw";
-import liquidGlassCss from "../../styles/themes/liquid-glass.css?raw";
 import nativeMaterial from "../../../src-tauri/src/infrastructure/window_material.rs?raw";
 import { getMaterialSurfaces } from "./appearance";
 
-it.each(["mica", "acrylic", "liquid-glass"])("%s has a continuous readable range without opaque child surfaces", theme => {
+it.each(["mica", "acrylic"])("%s has a continuous readable range without opaque child surfaces", theme => {
   const stops = [0, 1, 25, 50, 75, 99, 100].map(value => getMaterialSurfaces(value, theme));
   expect(stops[0].window).toBeGreaterThan(0);
   expect(stops[stops.length - 1].window).toBeLessThan(1);
@@ -20,29 +19,10 @@ it.each(["mica", "acrylic", "liquid-glass"])("%s has a continuous readable range
   }
 });
 
-it("preserves clear, frosted and diffuse texture across the slider", () => {
-  for (const value of [0, 25, 50, 75, 100]) {
-    const glass = getMaterialSurfaces(value, "liquid-glass");
-    const acrylic = getMaterialSurfaces(value, "acrylic");
-    const mica = getMaterialSurfaces(value, "mica");
-    expect(glass.backgroundBlur).toBeLessThan(acrylic.backgroundBlur);
-    expect(acrylic.backgroundBlur).toBeLessThan(mica.backgroundBlur);
-  }
-});
-
 it("keeps a safe default and bounds invalid stored settings", () => {
   expect(getMaterialSurfaces(-1)).toEqual(getMaterialSurfaces(0));
   expect(getMaterialSurfaces(101)).toEqual(getMaterialSurfaces(100));
   expect(getMaterialSurfaces(Number.NaN)).toEqual(getMaterialSurfaces(50));
-});
-
-it("clear glass keeps optical depth at maximum transparency and is still glass at zero", () => {
-  const clear = getMaterialSurfaces(0, "liquid-glass");
-  const soft = getMaterialSurfaces(100, "liquid-glass");
-  expect(clear.backgroundBlur).toBeGreaterThan(0);
-  expect(clear.window).toBeGreaterThan(0);
-  expect(soft.window).toBeLessThan(1);
-  expect(soft.backgroundBlur - clear.backgroundBlur).toBeGreaterThan(10);
 });
 
 it("keeps neutral mica matte while acrylic diffuses fine background detail even at maximum clarity", () => {
@@ -56,7 +36,7 @@ it("keeps neutral mica matte while acrylic diffuses fine background detail even 
 });
 
 it("keeps CSS background-image blur aligned with the native desktop material", () => {
-  for (const [theme, material] of [["mica", "Mica"], ["acrylic", "Frosted"], ["liquid-glass", "Clear"]]) {
+  for (const [theme, material] of [["mica", "Mica"], ["acrylic", "Frosted"]]) {
     const profile = nativeMaterial.match(new RegExp(`Material::${material} => \\(([\\d.]+), ([\\d.]+)\\)`));
     expect(profile, theme).not.toBeNull();
     const [min, max] = profile!.slice(1).map(Number);
@@ -68,8 +48,8 @@ it("keeps CSS background-image blur aligned with the native desktop material", (
 // This proves the fixed-palette neutral-backdrop bound, not photographic or
 // refractive rendering. Read the actual CSS colors so palette changes cannot
 // silently invalidate the opacity floor.
-it.each(["mica", "acrylic", "liquid-glass"])("%s protects every text tone across neutral backdrops in normal mode", theme => {
-  const themeCss: Record<string, string> = { mica: micaCss, acrylic: acrylicCss, "liquid-glass": liquidGlassCss };
+it.each(["mica", "acrylic"])("%s protects every text tone across neutral backdrops in normal mode", theme => {
+  const themeCss: Record<string, string> = { mica: micaCss, acrylic: acrylicCss };
   const textColors = [...materialCss.matchAll(/--text-(?:primary|secondary|muted):\s*#([\da-f]{6});/g)]
     .map(match => [0, 2, 4].map(index => parseInt(match[1].slice(index, index + 2), 16)));
   const tints = [...themeCss[theme].matchAll(/--material-rgb:\s*([\d, ]+);/g)]

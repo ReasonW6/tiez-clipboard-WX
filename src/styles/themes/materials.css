@@ -1,5 +1,5 @@
 /* One continuous material, from the title bar to the bottom of the window. */
-:is(:root, body):where(.theme-mica, .theme-acrylic, .theme-liquid-glass) {
+:is(:root, body):where(.theme-mica, .theme-acrylic) {
   --bg-body: transparent;
   --bg-content: transparent;
   --bg-toolbar: transparent;
@@ -69,7 +69,7 @@
   --queue-border: 1px solid var(--line-soft);
   --queue-shadow: var(--shadow-md);
 }
-:is(:root, body):where(.theme-mica, .theme-acrylic, .theme-liquid-glass).dark-mode {
+:is(:root, body):where(.theme-mica, .theme-acrylic).dark-mode {
   --bg-body: transparent;
   --bg-content: transparent;
   --bg-toolbar: transparent;
@@ -100,68 +100,68 @@
   --segment-active-background: rgba(226,235,255,.13);
   --shell-shadow: inset 0 1px 0 rgba(255,255,255,.04);
 }
-body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) { position: relative; isolation: isolate; }
-body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass).has-custom-bg::before {
+body:is(.theme-mica, .theme-acrylic) { position: relative; isolation: isolate; }
+body:is(.theme-mica, .theme-acrylic).has-custom-bg::before {
   content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
   background: var(--custom-bg-image) center / cover no-repeat; opacity: var(--custom-bg-opacity,.45);
   filter: blur(var(--material-background-blur)); transform: scale(1.08);
 }
-body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) #root { position: relative; }
-body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) #root::after {
+body:is(.theme-mica, .theme-acrylic) #root { position: relative; }
+body:is(.theme-mica, .theme-acrylic) #root::after {
   content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none;
   opacity: var(--material-grain,0);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Cpath fill='%23000' filter='url(%23n)' d='M0 0h128v128H0z'/%3E%3C/svg%3E");
 }
-body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) .app-container { position: relative; z-index: 1; }
-body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) .settings-group { background: transparent; box-shadow: none; backdrop-filter: none; }
-body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) .settings-group h3 { color: var(--text-primary); font-family: var(--font-main); font-weight: 700; transition: none; }
-body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) :is(.settings-subpage-note, .settings-inline-note, .glass-setting-hint, .glass-range-labels, .setting-item .hint) {
+body:is(.theme-mica, .theme-acrylic) .app-container { position: relative; z-index: 1; }
+body:is(.theme-mica, .theme-acrylic) .settings-group { background: transparent; box-shadow: none; backdrop-filter: none; }
+body:is(.theme-mica, .theme-acrylic) .settings-group h3 { color: var(--text-primary); font-family: var(--font-main); font-weight: 700; transition: none; }
+body:is(.theme-mica, .theme-acrylic) :is(.settings-subpage-note, .settings-inline-note, .glass-setting-hint, .glass-range-labels, .setting-item .hint) {
   font-size: 12px; font-weight: 500; line-height: 1.6; opacity: 1; color: var(--text-secondary);
 }
-body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) .settings-inline-choice-btn { border: var(--button-border); color: var(--text-primary); }
-body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) .settings-inline-choice-btn.active { color: var(--button-active-filled-color); }
-body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) .settings-footer-meta :is(button, div) { font-size: 12px !important; opacity: 1 !important; }
+body:is(.theme-mica, .theme-acrylic) .settings-inline-choice-btn { border: var(--button-border); color: var(--text-primary); }
+body:is(.theme-mica, .theme-acrylic) .settings-inline-choice-btn.active { color: var(--button-active-filled-color); }
+body:is(.theme-mica, .theme-acrylic) .settings-footer-meta :is(button, div) { font-size: 12px !important; opacity: 1 !important; }
 /* These transparent footer links need a text tone, not the filled-button blue. */
-body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) .settings-footer-meta { --accent-color: var(--material-link-color); }
+body:is(.theme-mica, .theme-acrylic) .settings-footer-meta { --accent-color: var(--material-link-color); }
 /* Accent fills and ink on translucent surfaces need different luminance. */
-body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) :is(.tm-tag.active, .tm-tag.active .tm-count, .tm-create-tag, .tm-button.active) {
+body:is(.theme-mica, .theme-acrylic) :is(.tm-tag.active, .tm-tag.active .tm-count, .tm-create-tag, .tm-button.active) {
   color: var(--material-link-color);
 }
-body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) .tm-view-toggle .active { color: var(--text-primary); }
-body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) .tm-search input::placeholder { opacity: 1; }
-body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) .selected .tm-checkbox { color: var(--button-active-filled-color, white); }
-body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) .item-meta-right-info { opacity: 1; color: var(--text-muted); }
-body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) :is(.sensitive-preview, .sensitive-preview-length) {
+body:is(.theme-mica, .theme-acrylic) .tm-view-toggle .active { color: var(--text-primary); }
+body:is(.theme-mica, .theme-acrylic) .tm-search input::placeholder { opacity: 1; }
+body:is(.theme-mica, .theme-acrylic) .selected .tm-checkbox { color: var(--button-active-filled-color, white); }
+body:is(.theme-mica, .theme-acrylic) .item-meta-right-info { opacity: 1; color: var(--text-muted); }
+body:is(.theme-mica, .theme-acrylic) :is(.sensitive-preview, .sensitive-preview-length) {
   opacity: 1 !important;
   color: var(--text-secondary);
 }
-body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) .quick-paste-hint { color: var(--material-link-color); }
+body:is(.theme-mica, .theme-acrylic) .quick-paste-hint { color: var(--material-link-color); }
 .range-value { font-variant-numeric: tabular-nums; }
-body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) .tm-dialog { background: var(--material-solid); }
-body.windows-10:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) { --bg-window: var(--material-solid); }
-body.compact-preview:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) #root {
+body:is(.theme-mica, .theme-acrylic) .tm-dialog { background: var(--material-solid); }
+body.windows-10:is(.theme-mica, .theme-acrylic) { --bg-window: var(--material-solid); }
+body.compact-preview:is(.theme-mica, .theme-acrylic) #root {
   background: transparent !important; border: none !important; box-shadow: none !important; backdrop-filter: none !important;
 }
 @media (prefers-reduced-transparency: reduce) {
-  :root:is(.theme-mica, .theme-acrylic, .theme-liquid-glass), body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) {
+  :root:is(.theme-mica, .theme-acrylic), body:is(.theme-mica, .theme-acrylic) {
     --bg-window: var(--material-solid) !important; --material-background-blur: 0px !important;
     --surface-fill: 1 !important; --material-content-opacity: 1 !important; --material-control-opacity: 1 !important; --material-toolbar-opacity: 0 !important; --shell-backdrop-filter: none !important;
   }
 }
 
-body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) :is(.theme-choice, .tm-tag, .segment-btn) {
+body:is(.theme-mica, .theme-acrylic) :is(.theme-choice, .tm-tag, .segment-btn) {
   transition: background-color .2s ease, border-color .2s ease, box-shadow .25s ease, color .2s ease;
 }
 /* Keep state ink and its supporting fill in the same frame. Cross-fading both
    can make the icon and background converge to the same intermediate tone. */
-body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) .btn-icon {
+body:is(.theme-mica, .theme-acrylic) .btn-icon {
   transition: border-color .2s ease, box-shadow .25s ease;
 }
-body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) :is(.btn-icon, .theme-choice, .tm-tag, .segment-btn):focus-visible {
+body:is(.theme-mica, .theme-acrylic) :is(.btn-icon, .theme-choice, .tm-tag, .segment-btn):focus-visible {
   outline: 2px solid var(--accent-color); outline-offset: 3px;
 }
 @media (forced-colors: active) {
-  :root:is(.theme-mica, .theme-acrylic, .theme-liquid-glass), body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) {
+  :root:is(.theme-mica, .theme-acrylic), body:is(.theme-mica, .theme-acrylic) {
     --bg-window: Canvas !important; --bg-panel: Canvas !important; --bg-element: Canvas !important; --bg-input: Canvas !important; --bg-button: Canvas !important;
      --material-solid: Canvas !important; --text-primary: CanvasText !important; --text-secondary: CanvasText !important;
     --line-soft: ButtonText !important; --line-strong: Highlight !important; --accent-color: Highlight !important; --material-background-blur: 0px !important;
@@ -169,17 +169,17 @@ body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) :is(.btn-icon, .theme-
 }
 
 /* The legacy dark search rule uses 50% white; glass needs the full text tone. */
-:root body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) .search-input::placeholder { color: var(--text-secondary) !important; opacity: 1; }
+:root body:is(.theme-mica, .theme-acrylic) .search-input::placeholder { color: var(--text-secondary) !important; opacity: 1; }
 body.theme-sakura .empty-state-message {
   max-width: calc(100% - 32px); padding: 22px 26px; border-radius: 16px;
   background: var(--bg-panel); border: var(--panel-border);
 }
-body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) .empty-state-message {
+body:is(.theme-mica, .theme-acrylic) .empty-state-message {
   max-width: calc(100% - 32px); padding: 22px 26px;
   background: transparent; border: 0; box-shadow: none;
 }
-body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) .empty-state-message p { opacity: 1 !important; }
-body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) .empty-state-message p:last-child { color: var(--text-secondary); }
+body:is(.theme-mica, .theme-acrylic) .empty-state-message p { opacity: 1 !important; }
+body:is(.theme-mica, .theme-acrylic) .empty-state-message p:last-child { color: var(--text-secondary); }
 @media (prefers-reduced-motion: reduce) {
-  body:is(.theme-mica, .theme-acrylic, .theme-liquid-glass) :is(.btn-icon, .theme-choice, .tm-tag, .segment-btn) { transition: none; }
+  body:is(.theme-mica, .theme-acrylic) :is(.btn-icon, .theme-choice, .tm-tag, .segment-btn) { transition: none; }
 }

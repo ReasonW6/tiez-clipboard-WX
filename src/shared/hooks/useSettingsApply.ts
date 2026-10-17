@@ -3,7 +3,6 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { applyThemeClasses, normalizeThemeId } from "../config/themes";
 import { applyColorMode, applySurfaceSettings } from "../lib/appearance";
-import { startNativeGlass } from "../lib/nativeGlass";
 
 interface UseSettingsApplyOptions {
   theme: string;
@@ -43,7 +42,6 @@ export const useSettingsApply = ({
     const normalizedTheme = normalizeThemeId(theme);
     applyThemeClasses(normalizedTheme, document.documentElement, document.body);
     if (colorMode === "light" || colorMode === "dark") applyColorMode(colorMode);
-    const nativeGlass = normalizedTheme === "liquid-glass" ? startNativeGlass() : undefined;
 
     const updateNative = () => {
       nativeThemeUpdate = nativeThemeUpdate.catch(() => {}).then(async () => {
@@ -51,7 +49,6 @@ export const useSettingsApply = ({
         await invoke("set_theme", {
           theme: normalizedTheme, colorMode, showAppBorder, surfaceOpacity: latestOpacity.current
         });
-        if (!disposed) await nativeGlass?.afterThemeApplied();
         // Query only after clearing the window's explicit mode when following the OS.
         if (colorMode === "system" && !disposed) {
           const mode = await getCurrentWindow().theme();
@@ -73,11 +70,11 @@ export const useSettingsApply = ({
       }).then(off => { if (disposed) off(); else unlisten = off; }).catch(console.error);
     }
     updateNative();
-    return () => { disposed = true; unlisten?.(); nativeGlass?.dispose(); };
+    return () => { disposed = true; unlisten?.(); };
   }, [theme, colorMode, settingsLoaded, showAppBorder]);
 
   useEffect(() => {
-    if (!settingsLoaded || !["mica", "acrylic", "liquid-glass"].includes(theme)) return;
+    if (!settingsLoaded || !["mica", "acrylic"].includes(theme)) return;
     let disposed = false;
     nativeThemeUpdate = nativeThemeUpdate.catch(() => {}).then(async () => {
       if (!disposed) await invoke("set_material_opacity", { opacity: surfaceOpacity });

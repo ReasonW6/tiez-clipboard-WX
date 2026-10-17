@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 
-async function start(page: Page, theme = "liquid-glass", mode = "light") {
+async function start(page: Page, theme = "mica", mode = "light") {
   await page.goto(`/tests/ui/harness.html?theme=${theme}&mode=${mode}`);
   await expect(page.locator(".header-title")).toHaveText("TieZ");
   await expect(page.locator("body")).toHaveClass(/native-window-frame/);
@@ -14,12 +14,12 @@ const alpha = (page: Page, selector: string) => page.locator(selector).first().e
   return color.startsWith("rgba") ? Number(color.split(",").at(-1)!.replace(")", "")) : 1;
 });
 
-for (const theme of ["mica", "acrylic", "liquid-glass", "sakura"]) {
+for (const theme of ["mica", "acrylic", "sakura"]) {
   for (const mode of ["light", "dark"]) {
     test(`${theme} ${mode}: transparency stays continuous within its readable surface range`, async ({ page }) => {
       await start(page, theme, mode);
       await appearance(page);
-      const slider = page.getByRole("slider", { name: theme === "liquid-glass" ? "液态玻璃透明度" : "界面透明度" });
+      const slider = page.getByRole("slider", { name: "界面透明度" });
       const values: number[] = [];
       const fills: number[] = [];
       for (const opacity of [0, 1, 25, 50, 75, 99, 100]) {
@@ -57,7 +57,7 @@ for (const theme of ["mica", "acrylic", "liquid-glass", "sakura"]) {
 }
 
 test("native corner clipping has one owner and fills all four corners", async ({ page }) => {
-  for (const theme of ["mica", "acrylic", "liquid-glass", "sakura"]) {
+  for (const theme of ["mica", "acrylic", "sakura"]) {
     await start(page, theme);
     for (const selector of ["html", "body", "#root", ".app-container"]) {
       await expect(page.locator(selector)).toHaveCSS("border-top-left-radius", "0px");
@@ -92,7 +92,7 @@ test("one transparency slider persists and ignores the removed blur option", asy
   });
   await start(page);
   await appearance(page);
-  const slider = page.getByRole("slider", { name: "液态玻璃透明度" });
+  const slider = page.getByRole("slider", { name: "界面透明度" });
   await expect(slider).toHaveCount(1);
   await expect(page.getByRole("slider", { name: "玻璃模糊度" })).toHaveCount(0);
   await slider.fill("100");
@@ -101,36 +101,24 @@ test("one transparency slider persists and ignores the removed blur option", asy
   await page.reload();
   await expect.poll(() => alpha(page, "#root")).toBe(clear);
   await appearance(page);
-  await expect(page.getByRole("slider", { name: "液态玻璃透明度" })).toHaveValue("100");
+  await expect(page.getByRole("slider", { name: "界面透明度" })).toHaveValue("100");
 });
 
-test("category selection keeps one lens per button and reduced motion disables press animation", async ({ page }) => {
+test("category selection keeps its layout and resets when the window hides", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
-  await page.emulateMedia({ reducedMotion: "no-preference" });
   await start(page);
   const first = page.getByTitle("文本", { exact: true });
   const second = page.getByTitle("图片", { exact: true });
   await first.click();
   await expect(first).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator(".type-filter-btn > .glass-lens")).toHaveCount(7);
   const initial = await first.boundingBox();
   await second.click();
   await expect(second).toHaveAttribute("aria-pressed", "true");
   await expect(first).toHaveAttribute("aria-pressed", "false");
-  await expect(page.locator(".type-filter-btn > .glass-lens")).toHaveCount(7);
   expect(await first.boundingBox()).toEqual(initial);
-  const settings = page.getByTitle("设置", { exact: true });
-  await settings.hover(); await page.mouse.down();
-  await expect(settings).toHaveCSS("scale", "0.97");
-  await page.mouse.up();
   await page.evaluate(() => (window as any).testApp.emit("main-window-hidden"));
   await expect(page.locator(".type-filter-btn[aria-pressed=true]")).toHaveCount(0);
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await settings.hover(); await page.mouse.down();
-  await expect(settings).toHaveCSS("transition-duration", "0s");
-  await expect(settings).toHaveCSS("scale", "none");
-  await page.mouse.up();
   expect(errors).toEqual([]);
 });
 

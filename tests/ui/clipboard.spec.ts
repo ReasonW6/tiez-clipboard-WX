@@ -25,7 +25,7 @@ async function appearance(page: Page) {
 const commandCalls = (page: Page, command: string) => page.evaluate(command =>
   (window as any).testApp.calls.filter((c: any) => c.command === command), command);
 
-for (const theme of ["mica", "acrylic", "liquid-glass", "retro", "sticky-note", "paper", "sakura"]) {
+for (const theme of ["mica", "acrylic", "retro", "sticky-note", "paper", "sakura"]) {
   test(`${theme}: explicit light survives a dark system theme`, async ({ page }) => {
     await start(page, `?theme=${theme}&mode=light`);
     await expect(page.locator("body")).toHaveClass(new RegExp(`light-mode`));
@@ -149,26 +149,6 @@ test("paste preserves IDs; edit/delete actions do not trigger a paste", async ({
   expect(await commandCalls(page, "copy_to_clipboard")).toHaveLength(1);
 });
 
-test("one glass transparency slider updates the material and persists", async ({ page }) => {
-  await start(page, "?theme=liquid-glass");
-  await appearance(page);
-  const transparency = page.getByRole("slider", { name: "液态玻璃透明度" });
-  await expect(page.getByRole("slider", { name: "玻璃模糊度" })).toHaveCount(0);
-  await transparency.fill("80");
-  await expect.poll(() => page.evaluate(() => getComputedStyle(document.body).getPropertyValue("--surface-opacity"))).toBe("0.2");
-  const fill = await page.locator("#root").evaluate(el => getComputedStyle(el).backgroundColor);
-  expect(await page.evaluate(() => (window as any).testApp.settings["app.surface_opacity"])).toBe("20");
-  await page.reload();
-  await expect(page.locator(".header-title")).toHaveText("TieZ");
-  await expect(page.locator("#root")).toHaveCSS("background-color", fill);
-  await openTags(page);
-  await expect(page.locator(".tm-search")).toHaveCSS("backdrop-filter", "none");
-  await expect(page.locator(".tm-text").first()).toHaveCSS("text-shadow", "none");
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  expect(await page.locator(".tm-add").evaluate(el => getComputedStyle(el).transitionDuration)).toBe("0s");
-});
-
-
 test("tag CRUD preserves renamed items and confirms deleting a tag and its items", async ({ page }) => {
   await start(page);
   await openTags(page);
@@ -194,17 +174,7 @@ test("tag CRUD preserves renamed items and confirms deleting a tag and its items
 });
 
 
-test("glass uses solid surfaces when transparency is reduced, including dark mode", async ({ page }) => {
-  await start(page, "?theme=liquid-glass&mode=dark");
-  const cdp = await page.context().newCDPSession(page);
-  await cdp.send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-transparency", value: "reduce" }] });
-  expect(await page.locator("#root").evaluate(el => getComputedStyle(el).backgroundColor)).toBe("rgb(23, 31, 43)");
-  await openTags(page);
-  expect(await page.locator(".tm-search").evaluate(el => getComputedStyle(el, "::before").backdropFilter)).toBe("none");
-});
-
-
-for (const theme of ["mica", "acrylic", "liquid-glass", "retro", "sticky-note", "paper", "sakura"]) {
+for (const theme of ["mica", "acrylic", "retro", "sticky-note", "paper", "sakura"]) {
   test(`${theme}: explicit dark stays dark in a light system`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: "light" });
     await start(page, `?theme=${theme}&mode=dark`);

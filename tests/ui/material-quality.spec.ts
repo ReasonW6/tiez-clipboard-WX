@@ -1,19 +1,19 @@
 import { test, expect, type Page } from "@playwright/test";
 
-async function start(page: Page, theme = "liquid-glass", mode = "light") {
+async function start(page: Page, theme = "mica", mode = "light") {
   await page.goto(`/tests/ui/harness.html?theme=${theme}&mode=${mode}`);
   await expect(page.locator(".history-item").first()).toBeVisible();
   await expect.poll(() => page.evaluate(() => (window as any).testApp.calls.filter((c: any) => c.command === "set_theme").length)).toBeGreaterThan(0);
 }
 const nativeCalls = (page: Page) => page.evaluate(() => (window as any).testApp.calls.filter((c: any) => c.command === "set_theme").length);
 
-for (const theme of ["liquid-glass", "mica", "acrylic"]) {
+for (const theme of ["mica", "acrylic"]) {
   test(`${theme}: endpoints must not switch native rendering mode`, async ({ page }) => {
     await start(page, theme);
     await page.getByTitle("设置", { exact: true }).click();
     await page.getByRole("heading", { name: "界面设置", exact: true }).click();
     const before = await nativeCalls(page);
-    const slider = page.getByRole("slider", { name: theme === "liquid-glass" ? "液态玻璃透明度" : "界面透明度" });
+    const slider = page.getByRole("slider", { name: "界面透明度" });
     for (const opacity of [0, 1, 25, 50, 75, 99, 100]) {
       await slider.fill(String(100 - opacity));
       await expect.poll(() => page.evaluate(() => Number((window as any).testApp.settings["app.surface_opacity"]))).toBe(opacity);
@@ -44,7 +44,7 @@ test("content text has no blur, glow, displacement or global backdrop filter", a
 // preserves these inputs. This does not measure image/optical highlights or the
 // native compositor; those need separate visual checks. Test normal transparency,
 // since a solid accessibility fallback must not conceal an unreadable clear end.
-for (const theme of ["liquid-glass", "mica", "acrylic"]) {
+for (const theme of ["mica", "acrylic"]) {
   for (const mode of ["light", "dark"]) {
     test(`${theme} ${mode}: normal transparency protects text and controls over desktop colors`, async ({ page }) => {
       const cdp = await page.context().newCDPSession(page);
@@ -109,16 +109,16 @@ test("saved material is already applied while native settings are still loading"
   await start(page);
   await page.getByTitle("设置", { exact: true }).click();
   await page.getByRole("heading", { name: "界面设置", exact: true }).click();
-  await page.getByRole("slider", { name: "液态玻璃透明度" }).fill("100");
+  await page.getByRole("slider", { name: "界面透明度" }).fill("100");
   await expect.poll(() => page.evaluate(() => localStorage.getItem("tiez_surface_opacity"))).toBe("0");
   const saved = await page.locator("#root").evaluate(el => getComputedStyle(el).backgroundColor);
-  await page.goto("/tests/ui/harness.html?theme=liquid-glass&mode=light&settingsDelay=3000");
-  await expect(page.locator("body")).toHaveClass(/theme-liquid-glass/);
+  await page.goto("/tests/ui/harness.html?theme=mica&mode=light&settingsDelay=3000");
+  await expect(page.locator("body")).toHaveClass(/theme-mica/);
   await expect(page.locator("#root")).toHaveCSS("background-color", saved);
   expect(await page.evaluate(() => (window as any).testApp.calls.filter((c: any) => c.command === "set_theme").length)).toBe(0);
 });
 
-for (const theme of ["liquid-glass", "mica", "acrylic"]) {
+for (const theme of ["mica", "acrylic"]) {
   for (const mode of ["light", "dark"]) {
     test(`${theme} ${mode}: clear material keeps real settings footer links readable`, async ({ page }) => {
       const cdp = await page.context().newCDPSession(page);
