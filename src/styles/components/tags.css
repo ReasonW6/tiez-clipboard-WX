@@ -69,6 +69,22 @@
     box-shadow: var(--tag-chip-active-shadow);
 }
 
+/* The tag picked from the dropdown, shown inside the search field before the
+   typed text. Clicks fall through to the input behind it. */
+.tag-chip.search-tag-chip {
+    position: absolute;
+    left: 32px;
+    top: 50%;
+    z-index: 1;
+    display: block;
+    max-width: 45%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    pointer-events: none;
+    transform: translateY(-50%);
+}
+
 /* Inline tag editor: input + floating suggestion list (same column width) */
 .tag-edit-anchor {
     position: relative;

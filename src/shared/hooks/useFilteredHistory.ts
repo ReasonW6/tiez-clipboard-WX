@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import type { ClipboardEntry } from "../types";
+import { matchesSearch } from "../lib/searchQuery";
 
 interface UseFilteredHistoryOptions {
   history: ClipboardEntry[];
@@ -13,30 +14,11 @@ export const useFilteredHistory = ({
   typeFilter
 }: UseFilteredHistoryOptions) => {
   return useMemo(() => {
-    const lowerSearch = search.toLowerCase();
-
     const filtered = history.filter((item) => {
       if (typeFilter && item.content_type !== typeFilter) {
         return false;
       }
-
-      let effectiveSearch = lowerSearch;
-      const isTagSearch = effectiveSearch.startsWith("tag:");
-      if (isTagSearch) {
-        effectiveSearch = effectiveSearch.slice(4);
-      }
-
-      if (!effectiveSearch) return true;
-
-      if (isTagSearch) {
-        return item.tags?.some((tag) => tag.toLowerCase().includes(effectiveSearch)) ?? false;
-      }
-
-      return (
-        item.content?.toLowerCase().includes(effectiveSearch) ||
-        item.source_app?.toLowerCase().includes(effectiveSearch) ||
-        item.tags?.some((tag) => tag.toLowerCase().includes(effectiveSearch))
-      );
+      return matchesSearch(item, search);
     });
 
     return filtered.sort((a, b) => {

@@ -138,6 +138,13 @@ body:is(.theme-mica, .theme-acrylic) :is(.sensitive-preview, .sensitive-preview-
 body:is(.theme-mica, .theme-acrylic) .quick-paste-hint { color: var(--material-link-color); }
 .range-value { font-variant-numeric: tabular-nums; }
 body:is(.theme-mica, .theme-acrylic) .tm-dialog { background: var(--material-solid); }
+/* The tag dropdown floats over the type filters. The near-clear panel fill let
+   both rows of chips read as one; give it a plate of the window material. */
+body:is(.theme-mica, .theme-acrylic) .tags-dropdown {
+  background: rgba(var(--material-rgb), .94) !important;
+  box-shadow: var(--menu-shadow);
+  backdrop-filter: blur(12px);
+}
 body.windows-10:is(.theme-mica, .theme-acrylic) { --bg-window: var(--material-solid); }
 body.compact-preview:is(.theme-mica, .theme-acrylic) #root {
   background: transparent !important; border: none !important; box-shadow: none !important; backdrop-filter: none !important;

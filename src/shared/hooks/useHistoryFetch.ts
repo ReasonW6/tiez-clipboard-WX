@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { Dispatch, SetStateAction } from "react";
 import type { ClipboardEntry } from "../types";
+import { backendSearch } from "../lib/searchQuery";
 
 interface UseHistoryFetchOptions {
   debouncedSearch: string;
@@ -64,12 +65,7 @@ export const useHistoryFetch = ({
         const hasSearch = debouncedSearch && debouncedSearch.trim().length > 0;
 
         if (hasSearch) {
-          let term = debouncedSearch;
-          let tagOnly = false;
-          if (term.startsWith("tag:")) {
-            term = term.slice(4);
-            tagOnly = true;
-          }
+          const { term, tagOnly } = backendSearch(debouncedSearch);
 
           try {
             data = await invoke<ClipboardEntry[]>("search_clipboard_history", {

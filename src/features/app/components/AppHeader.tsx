@@ -1,4 +1,4 @@
-import type { RefObject } from "react";
+import { useCallback, useRef, useState, type RefObject } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ChevronLeft,
@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { getTagColor, getTagTextColor } from "../../../shared/lib/utils";
+import { parseSearch, searchWithTag } from "../../../shared/lib/searchQuery";
 import ClipboardTypeFilter from "./ClipboardTypeFilter";
 
 // Release the inline transform after projection so each theme keeps its CSS hover motion.
@@ -84,6 +85,24 @@ const AppHeader = ({
   onBack
 }: AppHeaderProps) => {
   const secondaryActionsVisible = !showSettings && !showTagManager && !showEmojiPanel;
+  const { tag: searchTag, text: searchText } = parseSearch(search);
+  const [searchTagWidth, setSearchTagWidth] = useState(0);
+  const searchTagObserver = useRef<ResizeObserver | null>(null);
+  // The input text starts after the picked tag, whatever its rendered width.
+  const observeSearchTag = useCallback((chip: HTMLSpanElement | null) => {
+    searchTagObserver.current?.disconnect();
+    searchTagObserver.current = null;
+    if (!chip) return;
+    const observer = new ResizeObserver(() => setSearchTagWidth(chip.offsetWidth));
+    observer.observe(chip);
+    searchTagObserver.current = observer;
+  }, []);
+  const tagChipStyle = (tag: string) => {
+    const background = getTagColor(tag, theme);
+    return { background, color: getTagTextColor(background, theme),
+      filter: ["mica", "acrylic"].includes(theme) ? "none" : undefined };
+  };
+  const updateSearchText = (text: string) => setSearch(searchTag !== null ? searchWithTag(searchTag, text) : text);
   // Retain layout snapshots while these actions are absent from the row. Newly
   // mounted buttons otherwise start at full spacing inside a shrinking parent.
   const secondaryActionProps = {
@@ -185,19 +204,31 @@ const AppHeader = ({
             <div className="search-container window-no-drag">
               <div style={{ position: 'relative' }}>
                 <Search size={14} className="search-icon" />
+                {searchTag !== null && (
+                  <span ref={observeSearchTag} className="tag-chip search-tag-chip" data-tag={searchTag} style={tagChipStyle(searchTag)}>
+                    {searchTag}
+                  </span>
+                )}
                 <input
                   ref={searchInputRef}
                   type="text"
                   className={`search-input ${showTagFilter && allTags.length > 0 ? 'dropdown-open' : ''}`}
-                  placeholder={t('search_placeholder')}
-                  value={search}
+                  placeholder={searchTag !== null ? "" : t('search_placeholder')}
+                  value={searchText}
                   onCompositionStart={() => setIsComposing(true)}
                   onCompositionEnd={(e) => {
                     setIsComposing(false);
-                    setSearch((e.target as HTMLInputElement).value);
+                    updateSearchText((e.target as HTMLInputElement).value);
                   }}
                   onChange={(e) => {
-                    setSearch(e.target.value);
+                    updateSearchText(e.target.value);
+                  }}
+                  onKeyDown={(e) => {
+                    // Backspace into the picked tag turns it back into editable text.
+                    if (e.key === "Backspace" && searchTag !== null && !searchText && !e.nativeEvent.isComposing) {
+                      e.preventDefault();
+                      setSearch("tag:" + searchTag);
+                    }
                   }}
                   onMouseDown={() => {
                     invoke("activate_window_focus").catch(console.error);
@@ -215,31 +246,29 @@ const AppHeader = ({
                       setSearchIsFocused(false);
                     }, 200);
                   }}
-                  style={{ color: colorMode === 'dark' ? '#ffffff' : undefined }}
+                  style={{ color: colorMode === 'dark' ? '#ffffff' : undefined,
+                    paddingLeft: searchTag !== null ? `${32 + searchTagWidth + 6}px` : undefined }}
                 />
                 {showTagFilter && searchIsFocused && allTags.length > 0 && (
                   <div className="tags-dropdown">
                     <div className="tags-label">{t('tags') || "Tags"}</div>
                     <div className="tags-list">
-                      {allTags.map(tag => {
-                        const tagBackground = getTagColor(tag, theme);
-                        return (
-                          <span
-                            className="tag-chip"
-                            key={tag}
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              setSearch("tag:" + tag);
-                              setShowTagFilter(false);
-                            }}
-                            data-tag={tag}
-                            style={{ background: tagBackground, color: getTagTextColor(tagBackground, theme),
-                              filter: ["mica", "acrylic"].includes(theme) ? "none" : undefined }}
-                          >
-                            {tag}
-                          </span>
-                        );
-                      })}
+                      {allTags.map(tag => (
+                        <span
+                          className="tag-chip"
+                          key={tag}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            // Typed text keeps searching inside the picked tag.
+                            setSearch(searchWithTag(tag, searchText.startsWith("tag:") ? "" : searchText));
+                            setShowTagFilter(false);
+                          }}
+                          data-tag={tag}
+                          style={tagChipStyle(tag)}
+                        >
+                          {tag}
+                        </span>
+                      ))}
                     </div>
                   </div>
                 )}
