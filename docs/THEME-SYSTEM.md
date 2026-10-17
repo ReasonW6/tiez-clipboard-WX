@@ -459,7 +459,6 @@ That is the foundation for adding future themes without rewriting multiple unrel
 
 The main shared UI layer has been normalized, but a few feature-local styles still carry direct visual assumptions and should be migrated into the same token contract in a follow-up pass:
 
-- `src/styles/components/Announcement.css`
 - `src/styles/components/compact-mode.css`
 - `src/styles/components/emoji.css`
 - `src/styles/components/file-transfer.css`
