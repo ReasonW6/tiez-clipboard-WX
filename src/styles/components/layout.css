@@ -181,14 +181,14 @@ select.search-input option {
 }
 .type-filter-selection {
   position: absolute;
-  top: 0;
-  left: 0;
+  inset: -1px;
   z-index: 0;
   pointer-events: none;
-  border-radius: 999px;
-  background: var(--accent-color);
+  border-radius: inherit;
+  background: var(--button-active-filled-background);
   box-shadow: 0 2px 5px rgba(var(--accent-color-rgb), .14);
 }
+.type-filter-label { position: relative; z-index: 1; }
 
 .main-content {
   flex: 1;

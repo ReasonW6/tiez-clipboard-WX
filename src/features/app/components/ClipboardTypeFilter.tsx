@@ -1,3 +1,5 @@
+import { motion, useReducedMotion } from "framer-motion";
+
 const TYPES = ["text", "image", "file", "url", "code", "video", "rich_text"];
 
 export default function ClipboardTypeFilter({ value, onChange, label }: {
@@ -5,6 +7,7 @@ export default function ClipboardTypeFilter({ value, onChange, label }: {
   onChange: (value: string | null) => void;
   label: (type: string) => string;
 }) {
+  const reduceMotion = useReducedMotion();
   return <div className="type-filter-scroll hide-scrollbar" onWheel={event => {
     if (event.deltaY !== 0) event.currentTarget.scrollLeft += event.deltaY;
   }}>
@@ -16,7 +19,12 @@ export default function ClipboardTypeFilter({ value, onChange, label }: {
         aria-pressed={value === type}
         onClick={() => onChange(value === type ? null : type)}
         title={label(type)}
-      ><span className="type-filter-label">{label(type)}</span></button>)}
+      >
+        {/* One selection plate slides between filters instead of two fills cross-fading. */}
+        {value === type && <motion.span layoutId="type-filter-selection" className="type-filter-selection"
+          transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 520, damping: 40, mass: .8 }} />}
+        <span className="type-filter-label">{label(type)}</span>
+      </button>)}
     </div>
   </div>;
 }

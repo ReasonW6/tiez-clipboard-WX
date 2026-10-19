@@ -5,8 +5,16 @@
   --bg-toolbar: transparent;
   --bg-window: rgba(var(--material-rgb),var(--surface-fill));
   --bg-panel: rgba(var(--material-rgb),var(--material-content-opacity));
-  --bg-element: var(--bg-panel);
-  --bg-input: rgba(var(--material-rgb),var(--material-control-opacity));
+  /* Layers sit on the window material as lighter plates (Fluent card/layer fill). */
+  --material-layer-rgb: 255,255,255;
+  --material-layer-opacity: calc(var(--material-layer-base) + var(--surface-opacity) * .2);
+  --bg-element: rgba(var(--material-layer-rgb),var(--material-layer-opacity));
+  --material-layer-hover: rgba(var(--material-layer-rgb),calc(var(--material-layer-opacity) + .14));
+  --material-layer-stroke: rgba(20,32,48,.075);
+  --material-control-stroke-bottom: rgba(20,32,48,.2);
+  --material-subtle-hover: rgba(20,32,48,.055);
+  --material-subtle-pressed: rgba(20,32,48,.035);
+  --bg-input: rgba(var(--material-layer-rgb),calc(var(--material-layer-opacity) + .06));
   --bg-button: var(--bg-input);
   --accent-color: #356ad8;
   --accent-color-rgb: 53, 106, 216;
@@ -14,7 +22,7 @@
   --material-link-color: #173f7a;
   --text-primary: #17212e;
   --text-secondary: #1d2b3b;
-  --text-muted: #2d3d50;
+  --text-muted: #3a4757;
   --material-solid: rgb(var(--material-rgb));
   --line-soft: rgba(35,48,65,var(--material-outline-opacity,.12));
   --line-strong: rgba(35,48,65,.24);
@@ -40,12 +48,13 @@
   --input-radius: 10px;
   --input-shadow: none;
   --input-focus-shadow: 0 0 0 2px rgba(var(--accent-color-rgb),.12);
-  --card-border: 1px solid var(--line-soft);
-  --card-radius: 12px;
-  --card-shadow: var(--shadow-xs);
-  --card-hover-shadow: var(--shadow-sm);
+  --card-border: 1px solid var(--material-layer-stroke);
+  --card-radius: 10px;
+  --card-shadow: 0 1px 2px rgba(20,32,48,.04);
+  --card-hover-shadow: 0 2px 8px rgba(20,32,48,.06);
   --card-hover-transform: none;
-  --card-selected-background: #e8f0fd;
+  --card-hover-border-color: rgba(20,32,48,.1);
+  --card-selected-background: linear-gradient(rgba(var(--accent-color-rgb),.1), rgba(var(--accent-color-rgb),.1)), var(--material-layer-hover);
   --card-selected-border-color: rgba(var(--accent-color-rgb),.4);
   --card-selected-shadow: none;
   --panel-border: 1px solid var(--line-soft);
@@ -75,11 +84,22 @@
   --bg-toolbar: transparent;
   --bg-window: rgba(var(--material-rgb),var(--surface-fill));
   --bg-panel: rgba(var(--material-rgb),var(--material-content-opacity));
-  --bg-element: var(--bg-panel);
-  --bg-input: rgba(var(--material-rgb),var(--material-control-opacity));
-  --bg-button: var(--bg-input);
+  --material-layer-opacity: calc(.03 + var(--surface-opacity) * .055);
+  --bg-element: rgba(var(--material-layer-rgb),var(--material-layer-opacity));
+  --material-layer-hover: rgba(var(--material-layer-rgb),calc(var(--material-layer-opacity) + .04));
+  --material-layer-stroke: rgba(0,0,0,.16);
+  --material-control-stroke-bottom: rgba(255,255,255,.14);
+  --material-subtle-hover: rgba(255,255,255,.065);
+  --material-subtle-pressed: rgba(255,255,255,.04);
+  --bg-input: rgba(var(--material-layer-rgb),calc(var(--material-layer-opacity) + .01));
+  /* Segmented and tag-manager controls stack lifts; keep their base on the dark tint. */
+  --bg-button: rgba(var(--material-rgb),var(--material-control-opacity));
   --text-primary: #f6f8fc;
-  --card-selected-background: #233750;
+  --card-border: 1px solid var(--material-layer-stroke);
+  --card-shadow: inset 0 1px 0 rgba(255,255,255,.05);
+  --card-hover-shadow: inset 0 1px 0 rgba(255,255,255,.07);
+  --card-hover-border-color: rgba(0,0,0,.2);
+  --card-selected-background: linear-gradient(rgba(var(--accent-color-rgb),.14), rgba(var(--accent-color-rgb),.14)), var(--material-layer-hover);
   --text-secondary: #e1e7f0;
   --text-muted: #d4deeb;
   --accent-color: #8aacff;
@@ -145,6 +165,12 @@ body:is(.theme-mica, .theme-acrylic) .tags-dropdown {
   box-shadow: var(--menu-shadow);
   backdrop-filter: blur(12px);
 }
+/* Flyouts open from their anchor instead of popping in. */
+@keyframes material-flyout-in { from { filter: opacity(0); transform: translateY(-4px); } }
+body:is(.theme-mica, .theme-acrylic) .tags-dropdown { animation: material-flyout-in .14s cubic-bezier(0, 0, 0, 1); }
+@media (prefers-reduced-motion: reduce) {
+  body:is(.theme-mica, .theme-acrylic) .tags-dropdown { animation: none; }
+}
 body.windows-10:is(.theme-mica, .theme-acrylic) { --bg-window: var(--material-solid); }
 body.compact-preview:is(.theme-mica, .theme-acrylic) #root {
   background: transparent !important; border: none !important; box-shadow: none !important; backdrop-filter: none !important;
@@ -189,4 +215,54 @@ body:is(.theme-mica, .theme-acrylic) .empty-state-message p { opacity: 1 !import
 body:is(.theme-mica, .theme-acrylic) .empty-state-message p:last-child { color: var(--text-secondary); }
 @media (prefers-reduced-motion: reduce) {
   body:is(.theme-mica, .theme-acrylic) :is(.btn-icon, .theme-choice, .tm-tag, .segment-btn) { transition: none; }
+}
+
+/* Fluent control language: quiet icon buttons, filled inputs with a bottom
+   stroke, tinted (not solid) state on per-item actions. */
+body:is(.theme-mica, .theme-acrylic) :is(.header-actions, .header-leading, .item-actions) .btn-icon {
+  background: transparent; border-color: transparent; box-shadow: none;
+}
+body:is(.theme-mica, .theme-acrylic) :is(.header-actions, .header-leading, .item-actions) .btn-icon:hover { background: var(--material-subtle-hover); border-color: transparent; box-shadow: none; }
+body:is(.theme-mica, .theme-acrylic) :is(.header-actions, .header-leading, .item-actions) .btn-icon:active { background: var(--material-subtle-pressed); }
+body:is(.theme-mica, .theme-acrylic) :is(.header-actions, .header-leading) .btn-icon.active {
+  background: var(--button-active-filled-background); border-color: var(--button-active-filled-border-color);
+  box-shadow: var(--button-active-filled-shadow);
+}
+body:is(.theme-mica, .theme-acrylic) :is(.header-actions, .header-leading) .btn-icon.active:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+body:is(.theme-mica, .theme-acrylic) .item-actions .btn-icon.active {
+  background: rgba(var(--accent-color-rgb),.14); border-color: transparent; box-shadow: none;
+  color: var(--material-link-color);
+}
+body:is(.theme-mica, .theme-acrylic) .item-actions .btn-icon.active:hover { background: rgba(var(--accent-color-rgb),.22); border-color: transparent; }
+body:is(.theme-mica, .theme-acrylic) .type-filter-btn {
+  background: var(--bg-input); border: 1px solid var(--material-layer-stroke); box-shadow: none; border-radius: 999px; padding: 4px 10px;
+}
+body:is(.theme-mica, .theme-acrylic) .type-filter-btn:hover { background: var(--material-layer-hover); }
+/* The sliding plate carries the active fill; the chip keeps only its ink. */
+body:is(.theme-mica, .theme-acrylic) .type-filter-btn.active { color: var(--button-active-filled-color); border-color: transparent; }
+body:is(.theme-mica, .theme-acrylic) .type-filter-selection { box-shadow: var(--button-active-filled-shadow); }
+body:is(.theme-mica, .theme-acrylic) .item-meta { border-bottom-color: transparent; font-weight: 600; }
+/* Pointer feedback is quick (Fluent "fast" timing); pressing settles back to rest. */
+body:is(.theme-mica, .theme-acrylic) .history-item {
+  transition: background-color .12s ease, border-color .12s ease, box-shadow .2s ease;
+}
+body:is(.theme-mica, .theme-acrylic) .history-item:not(.selected):hover { background: var(--material-layer-hover); }
+body:is(.theme-mica, .theme-acrylic) .history-item:not(.selected):active { background: var(--bg-element); transition-duration: .05s; }
+/* Selection follows the Fluent list pattern: a tinted plate and a short accent
+   pill on the leading edge, instead of a heavy double ring. */
+body:is(.theme-mica, .theme-acrylic) .history-item.selected { outline-color: transparent !important; }
+body:is(.theme-mica, .theme-acrylic) .history-item.selected::before {
+  content: ""; position: absolute; left: 4px; top: 50%; width: 3px; height: 18px; margin-top: -9px;
+  border-radius: 3px; background: var(--accent-color); animation: material-selection-in .18s cubic-bezier(0, 0, 0, 1);
+}
+@keyframes material-selection-in { from { transform: scaleY(0); } }
+@media (prefers-reduced-motion: reduce) {
+  body:is(.theme-mica, .theme-acrylic) .history-item.selected::before { animation: none; }
+}
+body:is(.theme-mica, .theme-acrylic) .search-input {
+  border: 1px solid var(--material-layer-stroke); border-bottom-color: var(--material-control-stroke-bottom);
+}
+body:is(.theme-mica, .theme-acrylic) .search-input:focus {
+  background: var(--material-layer-hover); border-color: var(--material-layer-stroke);
+  box-shadow: inset 0 -2px 0 var(--accent-color);
 }

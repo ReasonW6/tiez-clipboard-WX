@@ -52,7 +52,7 @@ pub fn blur_radius(material: Material, opacity: f64) -> f32 {
         0.5
     };
     let (min, max) = match material {
-        Material::Mica => (32.0, 56.0),
+        Material::Mica => (40.0, 64.0),
         Material::Frosted => (18.0, 38.0),
         Material::None => (0.0, 0.0),
     };
@@ -418,7 +418,7 @@ mod tests {
     #[test]
     fn materials_keep_distinct_clear_ends_without_wallpaper_tint() {
         assert_eq!(blur_radius(Material::Frosted, 0.0), 18.0);
-        assert_eq!(blur_radius(Material::Mica, 0.0), 32.0);
+        assert_eq!(blur_radius(Material::Mica, 0.0), 40.0);
         for theme in ["mica", "acrylic"] {
             assert_ne!(material_for(theme, true), Material::None);
             assert_eq!(material_for(theme, false), Material::None);

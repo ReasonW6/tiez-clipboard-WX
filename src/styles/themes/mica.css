@@ -1,6 +1,7 @@
 /* Neutral matte mica-style surface; no system wallpaper colorization. */
 :root.theme-mica, body.theme-mica {
-  --material-rgb: 236, 237, 239;
+  --material-rgb: 238, 239, 241;
+  --material-layer-base: .6;
   --material-grain: var(--material-grain-opacity,.008);
   --shell-backdrop-filter: none;
   --card-shadow: none;

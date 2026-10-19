@@ -18,7 +18,7 @@ export const getMaterialSurfaces = (opacity: number, theme = DEFAULT_THEME) => {
   const density = clampSurfaceOpacity(opacity) / 100;
   const profiles: Record<string, { minFill: number; maxFill: number; minBlur: number; maxBlur: number }> = {
     acrylic: { minFill: .74, maxFill: .90, minBlur: 18, maxBlur: 38 },
-    mica: { minFill: .86, maxFill: .98, minBlur: 32, maxBlur: 56 }
+    mica: { minFill: .875, maxFill: .98, minBlur: 40, maxBlur: 64 }
   };
   const profile = profiles[theme];
   if (profile) return {
