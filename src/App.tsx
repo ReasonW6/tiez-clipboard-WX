@@ -49,8 +49,6 @@ import { MotionConfig } from "framer-motion";
 import type { ClipboardEntry } from "./shared/types";
 import type { QuickPasteHint, VirtualClipboardListHandle } from "./features/clipboard/types";
 
-/** Must match privacy blur checks in `useClipboardItemRenderer` / `ClipboardItem`. */
-const BUILTIN_SENSITIVE_TAG_NAMES = ["sensitive", "密码", "password"] as const;
 import type { QuickPasteModifier } from "./features/app/types";
 import {
   forceHideCompactPreviewWindow,
@@ -397,9 +395,6 @@ const App = () => {
     if (!effectiveShowTagManager && !showTagFilter && editingTagsId === null) return [];
 
     const set = new Set<string>();
-    for (const tag of BUILTIN_SENSITIVE_TAG_NAMES) {
-      set.add(tag);
-    }
     history.forEach((item) => {
       (item.tags || []).forEach((tag) => set.add(tag));
     });

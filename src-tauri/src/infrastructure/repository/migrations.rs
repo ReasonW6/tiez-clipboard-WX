@@ -81,16 +81,6 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
             [],
         )?;
 
-        // Insert default tags
-        let _ = conn.execute(
-            "INSERT OR IGNORE INTO saved_tags (name) VALUES ('sensitive')",
-            [],
-        );
-        let _ = conn.execute(
-            "INSERT OR IGNORE INTO saved_tags (name) VALUES ('密码')",
-            [],
-        );
-
         conn.execute("INSERT INTO schema_migrations (version) VALUES (4)", [])?;
     }
 
@@ -230,6 +220,19 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
         tx.commit()?;
     }
 
+    // Migration 12: Start without tags. Drop the tags that migration 4 used to
+    // pre-create, unless an entry uses them or the user gave them a color.
+    if current_version < 12 {
+        conn.execute(
+            "DELETE FROM saved_tags
+             WHERE name IN ('sensitive', '密码')
+               AND (color IS NULL OR color = '')
+               AND NOT EXISTS (SELECT 1 FROM entry_tags WHERE entry_tags.tag = saved_tags.name)",
+            [],
+        )?;
+        conn.execute("INSERT INTO schema_migrations (version) VALUES (12)", [])?;
+    }
+
     Ok(())
 }
 
@@ -269,6 +272,26 @@ mod tests {
         crate::database::seed_defaults(&conn).unwrap();
         assert_retired_data_removed(&conn);
         assert!(has_column(&conn, "clipboard_history", "source_app_path").unwrap());
+        let tags: i64 = conn.query_row("SELECT COUNT(*) FROM saved_tags", [], |row| row.get(0)).unwrap();
+        assert_eq!(tags, 0);
+    }
+
+    #[test]
+    fn upgrade_drops_unused_preset_tags_only() {
+        let conn = Connection::open_in_memory().unwrap();
+        run_migrations(&conn).unwrap();
+        conn.execute_batch(
+            "DELETE FROM schema_migrations WHERE version = 12;
+             INSERT INTO saved_tags (name) VALUES ('sensitive'), ('work');
+             INSERT INTO saved_tags (name, color) VALUES ('密码', '#c37797');
+             INSERT INTO clipboard_history (id, content_type, content, source_app, timestamp, preview, is_pinned, tags)
+                 VALUES (7, 'text', 'note', 'Editor', 1, 'note', 0, '[\"work\"]');
+             INSERT INTO entry_tags (entry_id, tag) VALUES (7, 'work');",
+        ).unwrap();
+        run_migrations(&conn).unwrap();
+        let mut stmt = conn.prepare("SELECT name FROM saved_tags ORDER BY name").unwrap();
+        let names: Vec<String> = stmt.query_map([], |row| row.get(0)).unwrap().map(|r| r.unwrap()).collect();
+        assert_eq!(names, vec!["work", "密码"]);
     }
 
     #[test]
@@ -276,7 +299,7 @@ mod tests {
         let conn = Connection::open_in_memory().unwrap();
         run_migrations(&conn).unwrap();
         conn.execute_batch(
-            "DELETE FROM schema_migrations WHERE version = 11;
+            "DELETE FROM schema_migrations WHERE version >= 11;
              CREATE TABLE cloud_sync_tombstones (content_type TEXT, content_hash INTEGER, deleted_at INTEGER);
              CREATE TABLE cloud_sync_local_index (sync_key TEXT, digest TEXT);
              INSERT INTO settings (key, value) VALUES
