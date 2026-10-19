@@ -384,7 +384,8 @@ body:not(.theme-mica):not(.theme-acrylic) .history-item.compact .item-actions .b
 /* Retro Theme - Keep mechanical style */
 
 /* Hide Timestamp */
-.history-item.compact .app-info:last-child {
+.history-item.compact .app-info:last-child,
+.history-item.compact .meta-time {
     display: none !important;
 }
 

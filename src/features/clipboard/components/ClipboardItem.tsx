@@ -1643,7 +1643,7 @@ const ClipboardItem = ({
                                 {quickPasteHint.combo}
                             </span>
                         )}
-                        <span>{getConciseTime(item.timestamp, language)}</span>
+                        <span className="meta-time">{getConciseTime(item.timestamp, language)}</span>
                     </div>
                 </div>
             </div>
