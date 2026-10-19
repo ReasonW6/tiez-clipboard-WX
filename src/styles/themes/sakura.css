@@ -99,6 +99,9 @@ body.theme-sakura {
   --segment-active-shadow: 0 2px 8px rgba(180, 100, 120, 0.08);
 
   --tags-border: 1px solid rgba(212, 160, 175, 0.3);
+  /* The dropdown floats over the type filters; a see-through plate mixed both rows. */
+  --tags-background: #fff8fa;
+  --tags-radius: var(--input-radius);
   --tags-shadow: 0 6px 14px rgba(180, 100, 120, 0.06);
   --tag-chip-border: 1px solid rgba(212, 96, 122, 0.15);
   --tag-chip-radius: 8px;
@@ -246,6 +249,7 @@ body.theme-sakura #root > * {
     --data-panel-hover-background: rgba(255, 255, 255, 0.04);
 
     --tags-border: 1px solid rgba(255, 255, 255, 0.06);
+    --tags-background: #34252b;
     --tag-chip-border: 1px solid rgba(232, 112, 136, 0.12);
     --menu-border: 1px solid rgba(255, 255, 255, 0.06);
     --menu-shadow: var(--shadow-md);
@@ -304,6 +308,7 @@ body.dark-mode.theme-sakura {
   --data-panel-hover-background: rgba(255, 255, 255, 0.04);
 
   --tags-border: 1px solid rgba(255, 255, 255, 0.06);
+  --tags-background: #34252b;
   --tag-chip-border: 1px solid rgba(232, 112, 136, 0.12);
   --menu-border: 1px solid rgba(255, 255, 255, 0.06);
   --menu-shadow: var(--shadow-md);

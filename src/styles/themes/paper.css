@@ -87,6 +87,7 @@ body.theme-paper {
   --segment-active-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
 
   --tags-border: 1px solid #d5c4a1;
+  --tags-radius: var(--input-radius);
   --tags-shadow: none;
   --tag-chip-border: 1px solid #d5c4a1;
   --tag-chip-radius: 2px;

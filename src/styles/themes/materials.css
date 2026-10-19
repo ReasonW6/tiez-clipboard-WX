@@ -159,11 +159,24 @@ body:is(.theme-mica, .theme-acrylic) .quick-paste-hint { color: var(--material-l
 .range-value { font-variant-numeric: tabular-nums; }
 body:is(.theme-mica, .theme-acrylic) .tm-dialog { background: var(--material-solid); }
 /* The tag dropdown floats over the type filters. The near-clear panel fill let
-   both rows of chips read as one; give it a plate of the window material. */
+   both rows of chips read as one; give it an in-app acrylic flyout instead:
+   a lighter plate than the window (Fluent flyout), its stroke and a soft lift. */
 body:is(.theme-mica, .theme-acrylic) .tags-dropdown {
-  background: rgba(var(--material-rgb), .94) !important;
-  box-shadow: var(--menu-shadow);
-  backdrop-filter: blur(12px);
+  background: rgba(250,251,252,.92) !important;
+  border: 1px solid rgba(20,32,48,.08);
+  border-radius: var(--input-radius);
+  box-shadow: 0 8px 20px rgba(20,32,48,.12), 0 1px 3px rgba(20,32,48,.06);
+  backdrop-filter: blur(24px) saturate(150%);
+}
+body.dark-mode:is(.theme-mica, .theme-acrylic) .tags-dropdown {
+  background: linear-gradient(rgba(255,255,255,.06), rgba(255,255,255,.06)), rgba(var(--material-rgb), .92) !important;
+  border-color: rgba(255,255,255,.09);
+  box-shadow: 0 10px 24px rgba(0,0,0,.34), 0 1px 3px rgba(0,0,0,.2);
+}
+body:is(.theme-mica, .theme-acrylic) .tags-label {
+  font-weight: 600;
+  text-transform: none;
+  opacity: 1;
 }
 /* Flyouts open from their anchor instead of popping in. */
 @keyframes material-flyout-in { from { filter: opacity(0); transform: translateY(-4px); } }

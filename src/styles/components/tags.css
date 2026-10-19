@@ -18,7 +18,7 @@
     width: 100%;
     margin-top: 4px;
     padding: 10px 10px 12px;
-    background: var(--bg-element) !important;
+    background: var(--tags-background, var(--bg-element)) !important;
     border: var(--tags-border);
     border-radius: var(--tags-radius);
     box-shadow: var(--tags-shadow);
