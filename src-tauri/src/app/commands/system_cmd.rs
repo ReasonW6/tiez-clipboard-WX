@@ -30,10 +30,10 @@ pub fn toggle_autostart(enabled: bool) -> AppResult<()> {
     use winreg::RegKey;
 
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-    let key = hkcu
-        .open_subkey_with_flags(
+    let (key, _) = hkcu
+        .create_subkey_with_flags(
             "Software\\Microsoft\\Windows\\CurrentVersion\\Run",
-            KEY_WRITE | KEY_READ,
+            KEY_SET_VALUE | KEY_READ,
         )
         .map_err(|e| AppError::Internal(e.to_string()))?;
     let app_path = std::env::current_exe()
@@ -46,8 +46,13 @@ pub fn toggle_autostart(enabled: bool) -> AppResult<()> {
         key.set_value("TieZ", &cmd)
             .map_err(|e| AppError::Internal(e.to_string()))?;
     } else {
-        let _ = key.delete_value("TieZ");
-        let _ = key.delete_value("tie-z");
+        for name in ["TieZ", "tie-z"] {
+            if let Err(error) = key.delete_value(name) {
+                if error.kind() != std::io::ErrorKind::NotFound {
+                    return Err(AppError::Internal(error.to_string()));
+                }
+            }
+        }
     }
     Ok(())
 }
@@ -57,10 +62,34 @@ pub fn is_autostart_enabled() -> AppResult<bool> {
     use winreg::enums::*;
     use winreg::RegKey;
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-    let key = hkcu
-        .open_subkey("Software\\Microsoft\\Windows\\CurrentVersion\\Run")
-        .map_err(|e| AppError::Internal(e.to_string()))?;
-    Ok(key.get_value::<String, _>("TieZ").is_ok() || key.get_value::<String, _>("tie-z").is_ok())
+    let key = match hkcu.open_subkey("Software\\Microsoft\\Windows\\CurrentVersion\\Run") {
+        Ok(key) => key,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(error) => return Err(AppError::Internal(error.to_string())),
+    };
+    let app_path = std::env::current_exe()
+        .map_err(|error| AppError::Internal(error.to_string()))?;
+    Ok(["TieZ", "tie-z"].into_iter().any(|name| {
+        key.get_value::<String, _>(name).is_ok_and(|command| {
+            autostart_command_targets_app(&command, &app_path.to_string_lossy())
+        })
+    }))
+}
+
+fn autostart_command_targets_app(command: &str, app_path: &str) -> bool {
+    let command = command.trim();
+    let executable = if let Some(quoted) = command.strip_prefix('"') {
+        let Some((executable, rest)) = quoted.split_once('"') else {
+            return false;
+        };
+        if rest.chars().next().is_some_and(|c| !c.is_whitespace()) {
+            return false;
+        }
+        executable
+    } else {
+        command.split_whitespace().next().unwrap_or("")
+    };
+    !executable.is_empty() && executable.eq_ignore_ascii_case(app_path)
 }
 
 #[tauri::command]
@@ -681,4 +710,44 @@ fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod autostart_tests {
+    use super::autostart_command_targets_app;
+
+    #[test]
+    fn accepts_the_current_installation_with_optional_arguments() {
+        let app = r"D:\Apps\TieZ\tiez-app.exe";
+        for command in [
+            r#""D:\Apps\TieZ\tiez-app.exe" --minimized"#,
+            r#""d:\apps\tiez\TIEZ-APP.EXE""#,
+            r"D:\Apps\TieZ\tiez-app.exe --minimized",
+        ] {
+            assert!(autostart_command_targets_app(command, app), "{command}");
+        }
+    }
+
+    #[test]
+    fn supports_a_quoted_installation_path_containing_spaces() {
+        assert!(autostart_command_targets_app(
+            r#""D:\My Apps\TieZ\tiez-app.exe" --minimized"#,
+            r"D:\My Apps\TieZ\tiez-app.exe",
+        ));
+    }
+
+    #[test]
+    fn rejects_empty_stale_and_malformed_commands() {
+        let app = r"D:\Apps\TieZ\tiez-app.exe";
+        for command in [
+            "",
+            " ",
+            r#""Z:\DoesNotExist\TieZ\tiez-app.exe" --minimized"#,
+            r#""D:\Apps\TieZ\tiez-app.exe.bak" --minimized"#,
+            r#""D:\Apps\TieZ\tiez-app.exe"suffix"#,
+            r#""D:\Apps\TieZ\tiez-app.exe --minimized"#,
+        ] {
+            assert!(!autostart_command_targets_app(command, app), "{command}");
+        }
+    }
 }

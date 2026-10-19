@@ -35,7 +35,7 @@ export const useAppState = (): AppState => {
 
   const [editingTagsId, setEditingTagsId] = useState<number | null>(null);
   const [revealedIds, setRevealedIds] = useState<Set<number>>(new Set());
-  const [autoStart, setAutoStart] = useState(true);
+  const [autoStart, setAutoStart] = useState(false);
   const [deduplicate, setDeduplicate] = useState(true);
   const [persistent, setPersistent] = useState(true);
   const [persistentLimitEnabled, setPersistentLimitEnabled] = useState(true);

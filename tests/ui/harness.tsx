@@ -34,6 +34,7 @@ let savedTags = ["工作", "代码", "密码", "个人收藏", "一个很长的�
 let theme = "dark";
 let pinned = true;
 let recording = false;
+let autostartEnabled = true;
 let focusRequestsCompleted = 0;
 const calls: {command: string; args: any}[] = [];
 const delays: Record<string, number> = {};
@@ -106,13 +107,21 @@ mockIPC(async (command, args: any = {}) => {
     case "get_data_path": return "isolated-test-data";
     case "scan_installed_apps": return [];
     case "get_system_default_app": return "Test editor";
-    case "is_autostart_enabled": return true;
+    case "is_autostart_enabled":
+      if (params.has("autostartReadError")) throw new Error("Startup status unavailable");
+      return autostartEnabled;
+    case "toggle_autostart":
+      await pause(delays.autostart || 0);
+      if (failures.autostart) throw new Error("Startup registration denied");
+      autostartEnabled = args.enabled;
+      return null;
     case "get_clipboard_count": return entries.length;
     case "get_paste_queue": return { items: [], current_index: 0 };
     default: return null;
   }
 }, { shouldMockEvents: true });
 Object.assign(window, { testApp: { settings, calls, delays, failures, emit,
+  getAutostartEnabled: () => autostartEnabled,
   getFocusRequestsCompleted: () => focusRequestsCompleted,
   setContent: (id: number, content: string) => { const entry = entries.find(entry => entry.id === id)!; entry.content = content; },
   getEntries: () => structuredClone(entries), getTheme: () => theme } });

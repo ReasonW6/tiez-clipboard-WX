@@ -1,4 +1,4 @@
-import type { ComponentType, ReactNode } from "react";
+import { useState, type ComponentType, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
@@ -77,7 +77,11 @@ const GeneralSettingsGroup = ({
     soundVolume,
     setSoundVolume,
     saveAppSetting
-}: GeneralSettingsGroupProps) => (
+}: GeneralSettingsGroupProps) => {
+    const [savingAutostart, setSavingAutostart] = useState(false);
+    const [autostartError, setAutostartError] = useState("");
+
+    return (
     <div className={`settings-group ${collapsed ? 'collapsed' : ''}`}>
         <div className="group-header" onClick={onToggle}>
             <h3 style={{ margin: 0 }}>{t('general_settings')}</h3>
@@ -88,16 +92,26 @@ const GeneralSettingsGroup = ({
                 <div className="setting-item">
                     <div className="item-label-group">
                         <span className="item-label">{t('autostart')}</span>
+                        {autostartError && <span className="hint" role="alert">{autostartError}</span>}
                     </div>
                     <label className="switch">
                         <input
                             className="cb"
                             type="checkbox"
                             checked={autoStart}
-                            onChange={(e) => {
+                            disabled={savingAutostart}
+                            onChange={async (e) => {
                                 const enabled = e.target.checked;
-                                setAutoStart(enabled);
-                                invoke("toggle_autostart", { enabled }).catch(console.error);
+                                setSavingAutostart(true);
+                                setAutostartError("");
+                                try {
+                                    await invoke("toggle_autostart", { enabled });
+                                    setAutoStart(enabled);
+                                } catch (error) {
+                                    setAutostartError(t("autostart_failed") + String(error));
+                                } finally {
+                                    setSavingAutostart(false);
+                                }
                             }}
                         />
                         <div className="toggle"><div className="left" /><div className="right" /></div>
@@ -356,6 +370,7 @@ const GeneralSettingsGroup = ({
             </div>
         )}
     </div>
-);
+    );
+};
 
 export default GeneralSettingsGroup;
