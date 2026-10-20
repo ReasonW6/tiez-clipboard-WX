@@ -34,7 +34,8 @@
         "decorations": false,
         "devtools": true,
         "skipTaskbar": true,
-        "visible": true,
+        "visible": false,
+        "focus": false,
         "dragDropEnabled": false,
         "focusable": true
       }
