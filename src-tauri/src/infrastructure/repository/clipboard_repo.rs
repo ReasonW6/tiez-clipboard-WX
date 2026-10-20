@@ -1336,12 +1336,14 @@ mod tests {
     fn text_lookup_matches_hash_within_type_and_legacy_rows_by_content() {
         let (repo, conn) = repo_with_schema();
         let id = repo.save(&entry("text", "hello world", &[]), None).unwrap();
+        let lines_id = repo.save(&entry("text", "two\nlines", &[]), None).unwrap();
         let rich_id = repo.save(&entry("rich_text", "rich words", &[]), None).unwrap();
         let conn = conn.lock().unwrap();
         let legacy_id = insert_raw(&conn, "text", "legacy note", 0);
 
         assert_eq!(repo.find_by_content_with_conn(&conn, "hello world", Some("text"), None).unwrap(), Some(id));
-        assert_eq!(repo.find_by_content_with_conn(&conn, " hello world\r\n", Some("text"), None).unwrap(), Some(id));
+        assert_eq!(repo.find_by_content_with_conn(&conn, "two\r\nlines", Some("text"), None).unwrap(), Some(lines_id));
+        assert_eq!(repo.find_by_content_with_conn(&conn, " hello world\r\n", Some("text"), None).unwrap(), None);
         assert_eq!(repo.find_by_content_with_conn(&conn, "hello world", Some("code"), None).unwrap(), None);
         assert_eq!(repo.find_by_content_with_conn(&conn, "rich words", Some("rich_text"), None).unwrap(), Some(rich_id));
         assert_eq!(repo.find_by_content_with_conn(&conn, "legacy note", Some("text"), None).unwrap(), Some(legacy_id));

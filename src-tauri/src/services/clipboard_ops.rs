@@ -486,7 +486,7 @@ async fn restore_focus_before_paste(_app_handle: &tauri::AppHandle) -> AppResult
 }
 
 fn calculate_content_hash(content: &str) -> (u64, u64) {
-    let normalized = content.trim().replace("\r\n", "\n");
+    let normalized = content.replace("\r\n", "\n");
     let mut hasher = DefaultHasher::new();
     normalized.hash(&mut hasher);
     let content_hash = hasher.finish();
@@ -1394,4 +1394,17 @@ pub fn paste_latest_rich(app_handle: tauri::AppHandle) {
             }
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::calculate_content_hash;
+    use crate::database::calc_text_hash;
+
+    #[test]
+    fn paste_echo_hash_keeps_edge_whitespace_and_matches_capture_hash() {
+        let (pasted, _) = calculate_content_hash("hello \r\n");
+        assert_eq!(pasted, calc_text_hash("hello \n"));
+        assert_ne!(pasted, calc_text_hash("hello"));
+    }
 }
