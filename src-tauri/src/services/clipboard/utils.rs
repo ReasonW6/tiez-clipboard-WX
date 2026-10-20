@@ -1119,7 +1119,9 @@ pub fn truncate_html_for_preview(html: &str) -> Option<String> {
         return None;
     }
 
-    let (without_named_formats, named_formats) = split_rich_html_and_named_formats(&repaired);
+    // Named formats only matter for pasting, which reloads the full entry by id,
+    // so the preview leaves them out.
+    let (without_named_formats, _) = split_rich_html_and_named_formats(&repaired);
     let (clean_html, image_fallback) = split_rich_html_and_image_fallback(&without_named_formats);
     let renderable_html = strip_office_preview_noise(&clean_html);
     let cleaned_repaired = repair_html_fragment(if renderable_html.trim().is_empty() {
@@ -1128,15 +1130,10 @@ pub fn truncate_html_for_preview(html: &str) -> Option<String> {
         &renderable_html
     });
     let reattach_preview_metadata = |html: String| {
-        let with_image = if let Some(payload) = image_fallback.as_deref() {
+        if let Some(payload) = image_fallback.as_deref() {
             attach_rich_image_fallback(&html, payload)
         } else {
             html
-        };
-        if named_formats.is_empty() {
-            with_image
-        } else {
-            attach_rich_named_formats(&with_image, &named_formats)
         }
     };
 
@@ -1462,6 +1459,33 @@ mod tests {
             Some("data:image/png;base64,AAAA")
         );
         assert_eq!(cleaned, "<table><tr><td>Excel</td></tr></table>");
+    }
+
+    #[test]
+    fn html_preview_drops_named_formats_but_keeps_rich_image_fallback() {
+        let row = "<tr><td>Excel</td><td>Preview</td></tr>";
+        let html = format!("<table>{}</table>", row.repeat(300));
+        let html = attach_rich_image_fallback(&html, "data:image/png;base64,AAAA");
+        let formats = vec![
+            crate::infrastructure::windows_api::win_clipboard::NamedClipboardFormat {
+                name: "Biff12".to_string(),
+                data: vec![7; 4096],
+            },
+        ];
+        let tagged = attach_rich_named_formats(&html, &formats);
+
+        let truncated = truncate_html_for_preview(&tagged).expect("html preview should exist");
+        let (_, restored_formats) = split_rich_html_and_named_formats(&truncated);
+        let (cleaned, restored_image) = split_rich_html_and_image_fallback(&truncated);
+
+        assert!(!truncated.contains("TIEZ_RICH_FORMATS"));
+        assert!(restored_formats.is_empty());
+        assert_eq!(
+            restored_image.as_deref(),
+            Some("data:image/png;base64,AAAA")
+        );
+        assert!(cleaned.starts_with("<table"));
+        assert!(cleaned.contains("Excel"));
     }
 
     #[test]

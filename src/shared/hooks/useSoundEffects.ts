@@ -13,13 +13,17 @@ export const useSoundEffects = ({
   pasteSoundEnabled
 }: UseSoundEffectsOptions) => {
   useEffect(() => {
+    if (!soundEnabled) return;
     const AudioContext =
       window.AudioContext ||
       (window as Window & { webkitAudioContext?: typeof window.AudioContext }).webkitAudioContext;
     if (!AudioContext) return;
-    const ctx = new AudioContext();
+    // Created on first playback: an AudioContext starts WebView2's audio service process.
+    let audioCtx: AudioContext | null = null;
+    const getCtx = () => (audioCtx ??= new AudioContext());
 
     const playCrispBeep = (durationSec = 0.1, baseFreqHz = 1400, volume = 0.35) => {
+      const ctx = getCtx();
       if (ctx.state === "suspended") ctx.resume();
 
       const t0 = ctx.currentTime;
@@ -92,11 +96,10 @@ export const useSoundEffects = ({
     };
 
     const unlisten = listen<string>("play-sound", (event) => {
-      if (!soundEnabled) return;
-
       const type = event.payload;
       if (type === "paste" && !pasteSoundEnabled) return;
       const masterVol = Math.min(1, Math.max(0, soundVolume / 100));
+      const ctx = getCtx();
 
       const play = () => {
         try {
@@ -127,7 +130,7 @@ export const useSoundEffects = ({
 
     return () => {
       unlisten.then((f) => f());
-      ctx.close();
+      audioCtx?.close();
     };
   }, [soundEnabled, soundVolume, pasteSoundEnabled]);
 };
