@@ -11,7 +11,7 @@ pub fn get_data_path(state: State<'_, AppDataDir>) -> AppResult<String> {
     Ok(path.to_string_lossy().to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn open_data_folder(state: State<'_, AppDataDir>) -> AppResult<()> {
     let path = state.0.lock().unwrap();
     let path_str = path.to_string_lossy().to_string();
@@ -24,7 +24,7 @@ pub fn open_data_folder(state: State<'_, AppDataDir>) -> AppResult<()> {
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn toggle_autostart(enabled: bool) -> AppResult<()> {
     use winreg::enums::*;
     use winreg::RegKey;
@@ -57,7 +57,7 @@ pub fn toggle_autostart(enabled: bool) -> AppResult<()> {
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn is_autostart_enabled() -> AppResult<bool> {
     use winreg::enums::*;
     use winreg::RegKey;
@@ -92,7 +92,7 @@ fn autostart_command_targets_app(command: &str, app_path: &str) -> bool {
     !executable.is_empty() && executable.eq_ignore_ascii_case(app_path)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn set_windows_clipboard_history(enabled: bool) -> AppResult<()> {
     use winreg::enums::*;
     use winreg::RegKey;
@@ -164,7 +164,7 @@ pub fn set_windows_clipboard_history(enabled: bool) -> AppResult<()> {
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_windows_clipboard_history() -> AppResult<bool> {
     use winreg::enums::*;
     use winreg::RegKey;
@@ -196,7 +196,7 @@ pub fn set_win_clipboard_disabled(_disabled: bool) -> AppResult<()> {
     set_windows_clipboard_history(!_disabled)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn trigger_registry_win_v_optimization(enable: bool) -> AppResult<bool> {
     use winreg::enums::*;
     use winreg::RegKey;
@@ -272,7 +272,7 @@ pub fn trigger_registry_win_v_optimization(enable: bool) -> AppResult<bool> {
     Ok(changed)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn is_registry_win_v_optimized() -> AppResult<bool> {
     Ok(get_registry_win_v_optimized_status())
 }
@@ -293,7 +293,7 @@ pub fn get_registry_win_v_optimized_status() -> bool {
     false
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn restart_explorer() -> AppResult<()> {
     use std::os::windows::process::CommandExt;
     use std::process::Command;
@@ -350,7 +350,7 @@ pub fn check_is_admin() -> bool {
     false
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn set_data_path(app_handle: AppHandle, new_path: String) -> AppResult<()> {
     let clean_path = new_path.trim().to_string();
     let new_data_path = std::path::Path::new(&clean_path);

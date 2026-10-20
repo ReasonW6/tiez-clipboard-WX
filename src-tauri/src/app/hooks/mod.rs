@@ -1,7 +1,9 @@
 use std::sync::atomic::Ordering;
 use tauri::{AppHandle, Emitter, Manager};
 #[cfg(target_os = "windows")]
-use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM};
+use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, RECT, WPARAM};
+#[cfg(target_os = "windows")]
+use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 #[cfg(target_os = "windows")]
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetAsyncKeyState, RegisterHotKey, UnregisterHotKey, MOD_NOREPEAT, MOD_WIN, VK_CONTROL, VK_LWIN,
@@ -9,8 +11,9 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 };
 #[cfg(target_os = "windows")]
 use windows::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, KBDLLHOOKSTRUCT, MSLLHOOKSTRUCT, WM_KEYDOWN, WM_KEYUP, WM_LBUTTONDOWN,
-    WM_MBUTTONDOWN, WM_RBUTTONDOWN, WM_SYSKEYDOWN, WM_SYSKEYUP,
+    CallNextHookEx, IsWindowVisible, PostThreadMessageW, SetWindowsHookExW, UnhookWindowsHookEx,
+    HHOOK, KBDLLHOOKSTRUCT, MSLLHOOKSTRUCT, WH_MOUSE_LL, WM_APP, WM_KEYDOWN, WM_KEYUP,
+    WM_LBUTTONDOWN, WM_MBUTTONDOWN, WM_RBUTTONDOWN, WM_SYSKEYDOWN, WM_SYSKEYUP,
 };
 
 use crate::app::window_manager::{hide_window_cmd, toggle_window};
@@ -108,10 +111,78 @@ fn quick_paste_modifier_active(
     }
 }
 
+/// Posted to the hook thread to install or remove the mouse hook.
+#[cfg(target_os = "windows")]
+pub const WM_SYNC_MOUSE_HOOK: u32 = WM_APP + 0x51;
+
+#[cfg(target_os = "windows")]
+pub fn main_hwnd() -> Option<HWND> {
+    match MAIN_HWND.load(Ordering::Relaxed) {
+        0 => None,
+        hwnd => Some(HWND(hwnd as _)),
+    }
+}
+
+// A low-level mouse hook runs for every mouse event in the system, so it is
+// installed only while mouse_proc has something to do: hide on clicks outside
+// the visible window, a middle-button main hotkey, or recording a hotkey.
+#[cfg(target_os = "windows")]
+fn mouse_hook_needed(window_visible: bool, main_hotkey: &str, recording: bool) -> bool {
+    window_visible
+        || recording
+        || main_hotkey.eq_ignore_ascii_case("MouseMiddle")
+        || main_hotkey.eq_ignore_ascii_case("MButton")
+}
+
+/// Ask the hook thread to bring the mouse hook in line with the current state.
+#[cfg(target_os = "windows")]
+pub fn refresh_mouse_hook() {
+    let thread_id = HOOK_THREAD_ID.load(Ordering::SeqCst);
+    if thread_id != 0 {
+        unsafe {
+            let _ = PostThreadMessageW(thread_id, WM_SYNC_MOUSE_HOOK, WPARAM(0), LPARAM(0));
+        }
+    }
+}
+
+/// Install or remove the mouse hook. Call only on the hook thread, which owns it.
+#[cfg(target_os = "windows")]
+pub fn sync_mouse_hook() {
+    let visible = main_hwnd().is_some_and(|hwnd| unsafe { IsWindowVisible(hwnd).as_bool() });
+    let needed = mouse_hook_needed(
+        visible,
+        &HOTKEY_STRING.lock().unwrap(),
+        IS_RECORDING.load(Ordering::SeqCst),
+    );
+    unsafe {
+        if needed {
+            if HOOK_MOUSE_HANDLE.load(Ordering::SeqCst).is_null() {
+                let Ok(module) = GetModuleHandleW(None) else {
+                    return;
+                };
+                if let Ok(hook) =
+                    SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_proc), Some(HINSTANCE(module.0)), 0)
+                {
+                    HOOK_MOUSE_HANDLE.store(hook.0 as _, Ordering::SeqCst);
+                }
+            }
+        } else {
+            let hook = HOOK_MOUSE_HANDLE.swap(std::ptr::null_mut(), Ordering::SeqCst);
+            if !hook.is_null() {
+                let _ = UnhookWindowsHookEx(HHOOK(hook as _));
+                // The release of a button held now would never be seen.
+                IS_MOUSE_BUTTON_DOWN.store(false, Ordering::SeqCst);
+            }
+        }
+    }
+}
+
 #[tauri::command]
 pub fn set_recording_mode(app_handle: AppHandle, enabled: bool) -> Result<(), String> {
     let mut ids = BLOCKED_HOTKEY_IDS.lock().unwrap();
     IS_RECORDING.store(enabled, Ordering::SeqCst);
+    #[cfg(target_os = "windows")]
+    refresh_mouse_hook();
 
     #[cfg(target_os = "windows")]
     if enabled {
@@ -506,8 +577,7 @@ pub unsafe extern "system" fn mouse_proc(n_code: i32, w_param: WPARAM, l_param: 
                             let mouse_struct = *(l_param.0 as *const MSLLHOOKSTRUCT);
                             let point = mouse_struct.pt;
 
-                            if let Ok(hwnd_raw) = window.hwnd() {
-                                let main_hwnd = HWND(hwnd_raw.0);
+                            if let Some(main_hwnd) = main_hwnd() {
                                 if !WindowExt::is_window_visible(main_hwnd) {
                                     return CallNextHookEx(None, n_code, w_param, l_param);
                                 }
@@ -547,7 +617,8 @@ pub unsafe extern "system" fn mouse_proc(n_code: i32, w_param: WPARAM, l_param: 
                 let current = HOTKEY_STRING.lock().unwrap().to_lowercase();
                 if current == "mousemiddle" || current == "mbutton" {
                     if let Some(handle) = GLOBAL_APP_HANDLE.get() {
-                        toggle_window(&handle);
+                        let app = handle.clone();
+                        let _ = handle.run_on_main_thread(move || toggle_window(&app));
                     }
                     return LRESULT(1);
                 }
@@ -653,7 +724,20 @@ pub fn is_win_v_hotkey(hotkey: &str) -> bool {
 
 #[cfg(all(test, target_os = "windows"))]
 mod recording_tests {
-    use super::{is_win_v_hotkey, recording_win_keys_after_event, win_v_action, WinVAction};
+    use super::{
+        is_win_v_hotkey, mouse_hook_needed, recording_win_keys_after_event, win_v_action,
+        WinVAction,
+    };
+
+    #[test]
+    fn mouse_hook_is_needed_only_while_something_consumes_clicks() {
+        assert!(!mouse_hook_needed(false, "Ctrl+Shift+V", false));
+        assert!(!mouse_hook_needed(false, "", false));
+        assert!(mouse_hook_needed(true, "Ctrl+Shift+V", false));
+        assert!(mouse_hook_needed(false, "MouseMiddle", false));
+        assert!(mouse_hook_needed(false, "mbutton", false));
+        assert!(mouse_hook_needed(false, "Win+V", true));
+    }
 
     #[test]
     fn win_v_takeover_handles_shell_reserved_aliases_only() {

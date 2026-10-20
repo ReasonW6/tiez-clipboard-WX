@@ -83,7 +83,8 @@ pub fn toggle_window(app: &AppHandle) {
             WindowExt::release_win_keys();
             let _ = hide_main_window(app);
 
-            let _ = restore_last_focus(app.clone());
+            #[cfg(windows)]
+            focus_last_active_window();
 
             IS_HIDDEN.store(false, Ordering::Relaxed);
             NAVIGATION_ENABLED.store(false, Ordering::SeqCst);
@@ -420,7 +421,8 @@ pub fn hide_window_cmd(app_handle: AppHandle) -> Result<(), String> {
         #[cfg(target_os = "windows")]
         WindowExt::release_win_keys();
         hide_main_window(&app_handle)?;
-        let _ = restore_last_focus(app_handle.clone());
+        #[cfg(windows)]
+        focus_last_active_window();
     }
     Ok(())
 }
@@ -477,15 +479,22 @@ pub fn focus_clipboard_window(app_handle: AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub fn restore_last_focus(_app_handle: AppHandle) -> Result<(), String> {
     #[cfg(windows)]
-    {
-        let last_hwnd_val = LAST_ACTIVE_HWND.load(Ordering::Relaxed);
-        if last_hwnd_val == 0 {
-            return Ok(());
-        }
-        WindowExt::force_focus_window(HWND(last_hwnd_val as _));
+    if focus_last_active_window() {
         std::thread::sleep(std::time::Duration::from_millis(60));
     }
     Ok(())
+}
+
+/// Give focus back to the window that was active before ours, without waiting
+/// for it to settle. Paths that send keys next use restore_last_focus instead.
+#[cfg(windows)]
+fn focus_last_active_window() -> bool {
+    let last_hwnd_val = LAST_ACTIVE_HWND.load(Ordering::Relaxed);
+    if last_hwnd_val == 0 {
+        return false;
+    }
+    WindowExt::force_focus_window(HWND(last_hwnd_val as _));
+    true
 }
 
 pub fn release_win_keys() {

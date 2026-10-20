@@ -1,5 +1,5 @@
 #[cfg(target_os = "windows")]
-use crate::app::hooks::{keyboard_proc, mouse_proc};
+use crate::app::hooks::{keyboard_proc, sync_mouse_hook, WM_SYNC_MOUSE_HOOK};
 #[cfg(target_os = "windows")]
 use crate::app::system::tray_subclass_proc;
 use crate::app::window_manager::{release_win_keys, restore_last_focus, toggle_window};
@@ -414,6 +414,7 @@ fn setup_main_window(app: &App, s: &StartupSettings) {
 
         #[cfg(windows)]
         if let Ok(hwnd) = window.hwnd() {
+            MAIN_HWND.store(hwnd.0 as usize, Ordering::Relaxed);
             unsafe {
                 let ex_style = windows::Win32::UI::WindowsAndMessaging::GetWindowLongPtrW(
                     HWND(hwnd.0),
@@ -616,8 +617,25 @@ fn start_services(app: &App, s: &StartupSettings, app_handle: AppHandle) {
 }
 
 #[cfg(target_os = "windows")]
+static EDGE_DOCKING_THREAD: OnceLock<std::thread::Thread> = OnceLock::new();
+
+/// Wake the edge docking monitor, which sleeps while docking is disabled.
+pub fn wake_edge_docking_monitor() {
+    #[cfg(target_os = "windows")]
+    if let Some(thread) = EDGE_DOCKING_THREAD.get() {
+        thread.unpark();
+    }
+}
+
+#[cfg(target_os = "windows")]
 fn start_edge_docking_monitor(app_handle: AppHandle) {
+    use windows::Win32::Graphics::Gdi::{
+        GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST,
+    };
+    use windows::Win32::UI::WindowsAndMessaging::{IsIconic, IsWindowVisible};
+
     std::thread::spawn(move || {
+        let _ = EDGE_DOCKING_THREAD.set(std::thread::current());
         loop {
             std::thread::sleep(std::time::Duration::from_millis(150));
 
@@ -634,16 +652,23 @@ fn start_edge_docking_monitor(app_handle: AppHandle) {
                         CURRENT_DOCK.store(0, Ordering::Relaxed);
                     }
                 }
+                // Nothing to watch until docking is enabled again.
+                std::thread::park();
                 continue;
             }
 
             if let Some(window) = app_handle.get_webview_window("main") {
+                // Query the window directly: Tauri's getters wait on the main thread.
+                let Some(hwnd) = crate::app::hooks::main_hwnd() else {
+                    continue;
+                };
+
                 // Skip if window is minimized
-                if window.is_minimized().unwrap_or(false) {
+                if unsafe { IsIconic(hwnd).as_bool() } {
                     continue;
                 }
 
-                let is_window_visible = window.is_visible().unwrap_or(true);
+                let is_window_visible = unsafe { IsWindowVisible(hwnd).as_bool() };
                 let is_hidden_by_edge = IS_HIDDEN.load(Ordering::Relaxed);
 
                 // Skip edge docking checks if window was hidden by other mechanisms (paste, blur, etc.)
@@ -672,12 +697,8 @@ fn start_edge_docking_monitor(app_handle: AppHandle) {
                 }
 
                 let mut rect = RECT::default();
-                let hwnd = match window.hwnd() {
-                    Ok(h) => h,
-                    Err(_) => continue,
-                };
                 unsafe {
-                    let _ = GetWindowRect(HWND(hwnd.0), &mut rect);
+                    let _ = GetWindowRect(hwnd, &mut rect);
                 }
 
                 let mut point = POINT::default();
@@ -686,18 +707,22 @@ fn start_edge_docking_monitor(app_handle: AppHandle) {
                 }
 
                 // Get current monitor info and validate
-                let monitor = match window.current_monitor() {
-                    Ok(Some(m)) => m,
-                    _ => continue,
+                let mut monitor = MONITORINFO {
+                    cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+                    ..Default::default()
                 };
-                let screen_size = monitor.size();
-                let screen_pos = monitor.position();
+                let found = unsafe {
+                    GetMonitorInfoW(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST), &mut monitor)
+                };
+                if !found.as_bool() {
+                    continue;
+                }
 
                 // Calculate monitor boundaries
-                let screen_left = screen_pos.x;
-                let screen_top = screen_pos.y;
-                let screen_right = screen_pos.x + screen_size.width as i32;
-                let screen_bottom = screen_pos.y + screen_size.height as i32;
+                let screen_left = monitor.rcMonitor.left;
+                let screen_top = monitor.rcMonitor.top;
+                let screen_right = monitor.rcMonitor.right;
+                let screen_bottom = monitor.rcMonitor.bottom;
 
                 // When hidden, check if mouse is near the edge sliver
                 let threshold = 5;
@@ -993,14 +1018,10 @@ fn apply_initial_theme(app: &App) {
 fn init_win32_hooks(_app: &App) {
     std::thread::spawn(move || {
         use windows::Win32::UI::WindowsAndMessaging::{
-            DispatchMessageW, GetMessageW, SetWindowsHookExW, TranslateMessage,
-            UnhookWindowsHookEx, MSG, WH_KEYBOARD_LL, WH_MOUSE_LL,
+            DispatchMessageW, GetMessageW, PeekMessageW, SetWindowsHookExW, TranslateMessage,
+            UnhookWindowsHookEx, MSG, PM_NOREMOVE, WH_KEYBOARD_LL, WM_USER,
         };
         unsafe {
-            HOOK_THREAD_ID.store(
-                windows::Win32::System::Threading::GetCurrentThreadId(),
-                Ordering::Relaxed,
-            );
             let h_instance = GetModuleHandleW(None).expect("Failed to get module handle");
             let h_hook = SetWindowsHookExW(
                 WH_KEYBOARD_LL,
@@ -1010,17 +1031,23 @@ fn init_win32_hooks(_app: &App) {
             )
             .expect("Failed to set hook");
             HOOK_HANDLE.store(h_hook.0 as _, Ordering::SeqCst);
-            let h_mouse_hook = SetWindowsHookExW(
-                WH_MOUSE_LL,
-                Some(mouse_proc),
-                Some(HINSTANCE(h_instance.0)),
-                0,
-            )
-            .expect("Failed to set mouse hook");
-            HOOK_MOUSE_HANDLE.store(h_mouse_hook.0 as _, Ordering::SeqCst);
 
+            // Create the message queue before publishing the thread id, so that
+            // no mouse hook request posted from then on is lost.
             let mut msg = MSG::default();
+            let _ = PeekMessageW(&mut msg, None, WM_USER, WM_USER, PM_NOREMOVE);
+            HOOK_THREAD_ID.store(
+                windows::Win32::System::Threading::GetCurrentThreadId(),
+                Ordering::SeqCst,
+            );
+            // The mouse hook comes and goes with demand.
+            sync_mouse_hook();
+
             while GetMessageW(&mut msg, None, 0, 0).as_bool() {
+                if msg.message == WM_SYNC_MOUSE_HOOK {
+                    sync_mouse_hook();
+                    continue;
+                }
                 let _ = TranslateMessage(&msg);
                 DispatchMessageW(&msg);
             }

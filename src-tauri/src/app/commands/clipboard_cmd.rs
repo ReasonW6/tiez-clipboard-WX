@@ -22,7 +22,7 @@ fn truncate_chars_with_suffix(text: &str, max_chars: usize, suffix: &str) -> Str
     out
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn toggle_clipboard_pin(
     app_handle: AppHandle,
     state: State<'_, DbState>,
@@ -75,7 +75,7 @@ pub fn toggle_clipboard_pin(
     Ok(real_id)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn update_tags(
     app_handle: AppHandle,
     state: State<'_, DbState>,

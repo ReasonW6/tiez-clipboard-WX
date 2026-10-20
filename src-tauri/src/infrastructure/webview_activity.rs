@@ -41,6 +41,8 @@ pub fn install(window: &WebviewWindow) {
         unsafe {
             if SetWindowSubclass(hwnd, Some(subclass_proc), SUBCLASS_ID, 0).as_bool() {
                 set_active(IsWindowVisible(hwnd).as_bool());
+                // Catch a show or hide that happened before the subclass was in place.
+                crate::app::hooks::refresh_mouse_hook();
             }
         }
     });
@@ -98,6 +100,12 @@ unsafe extern "system" fn subclass_proc(
             if SetTimer(Some(hwnd), SLEEP_TIMER_ID, SLEEP_DELAY_MS, None) == 0 {
                 set_active(false);
             }
+        }
+        // The mouse hook is only needed while the window is visible.
+        if msg == WM_WINDOWPOSCHANGED
+            && (flags.contains(SWP_SHOWWINDOW) || flags.contains(SWP_HIDEWINDOW))
+        {
+            crate::app::hooks::refresh_mouse_hook();
         }
     }
     if msg == WM_TIMER && wparam.0 == SLEEP_TIMER_ID {

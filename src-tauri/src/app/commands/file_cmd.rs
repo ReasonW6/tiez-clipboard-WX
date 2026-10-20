@@ -14,7 +14,7 @@ pub struct FileSize {
     pub size: u64,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_file_size(path: String) -> AppResult<FileSize> {
     use std::fs;
     let metadata = fs::metadata(&path).map_err(AppError::from)?;
@@ -164,7 +164,7 @@ pub async fn remove_emoji_favorite(app_data: State<'_, AppDataDir>, path: String
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_emoji_favorites(app_data: State<'_, AppDataDir>) -> AppResult<Vec<String>> {
     let data_dir = app_data.0.lock().unwrap().clone();
     list_emoji_favorite_paths_in_dir(&data_dir)

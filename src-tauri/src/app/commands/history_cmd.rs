@@ -20,7 +20,7 @@ fn normalize_rich_text_item_content(item: &mut ClipboardEntry) {
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_clipboard_history(
     state: State<'_, DbState>,
     session: State<'_, SessionHistory>,
@@ -102,7 +102,7 @@ pub fn get_clipboard_history(
     Ok(history)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn search_clipboard_history(
     state: State<'_, DbState>,
     session: State<'_, SessionHistory>,
@@ -179,7 +179,7 @@ pub fn search_clipboard_history(
     Ok(history)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn delete_clipboard_entry(
     app_handle: AppHandle,
     state: State<'_, DbState>,
@@ -200,7 +200,7 @@ pub fn delete_clipboard_entry(
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn clear_clipboard_history(
     app_handle: AppHandle,
     state: State<'_, DbState>,
@@ -217,7 +217,7 @@ pub fn clear_clipboard_history(
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_tag_items(state: State<'_, DbState>, tag: String) -> AppResult<Vec<ClipboardEntry>> {
     let mut history = state
         .tag_repo
@@ -255,14 +255,14 @@ pub fn get_tag_items(state: State<'_, DbState>, tag: String) -> AppResult<Vec<Cl
     Ok(history)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_all_tags_info(
     state: State<'_, DbState>,
 ) -> AppResult<std::collections::HashMap<String, i32>> {
     state.tag_repo.get_all_with_counts().map_err(AppError::from)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn rename_tag_globally(
     state: State<'_, DbState>,
     session: State<'_, SessionHistory>,
@@ -288,7 +288,7 @@ pub fn rename_tag_globally(
         .map_err(AppError::from)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn delete_tag_from_all(
     state: State<'_, DbState>,
     session: State<'_, SessionHistory>,
@@ -307,12 +307,12 @@ pub fn delete_tag_from_all(
         .map_err(AppError::from)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn create_new_tag(state: State<'_, DbState>, tag_name: String) -> AppResult<()> {
     state.tag_repo.create(&tag_name).map_err(AppError::from)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_clipboard_content(
     state: State<'_, DbState>,
     session: State<'_, SessionHistory>,
@@ -363,7 +363,7 @@ pub fn update_pinned_order(
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_db_count(state: State<'_, DbState>) -> AppResult<i64> {
     state.repo.get_count().map_err(AppError::from)
 }
