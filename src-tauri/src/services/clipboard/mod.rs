@@ -46,9 +46,9 @@ fn should_ignore_recent_image_echo(raw_hash: u64, visual_hash: impl FnOnce() -> 
         || ((last_app_visual_hash != 0) && last_app_visual_hash == visual_hash())
 }
 
-/// Hash for the short same-content window. Text decides when there is any; otherwise the
-/// image does, through the source's own PNG/JPEG bytes before the far larger DIB pixels;
-/// a copied file list (CF_HDROP) comes last.
+/// Hash for the short same-content window. Text and image both count, the image through the
+/// source's own PNG/JPEG bytes before the far larger DIB pixels; a copied file list
+/// (CF_HDROP) decides only when there is neither.
 fn clipboard_snapshot_hash(
     text: Option<&str>,
     native_image: impl FnOnce() -> Option<Vec<u8>>,
@@ -57,12 +57,16 @@ fn clipboard_snapshot_hash(
 ) -> u64 {
     use std::hash::{Hash, Hasher};
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    if let Some(text) = text.filter(|text| !text.trim().is_empty()) {
+    let text = text.filter(|text| !text.trim().is_empty());
+    if let Some(text) = text {
         text.hash(&mut hasher);
-    } else if let Some(bytes) = native_image().or_else(dib_pixels) {
+    }
+    if let Some(bytes) = native_image().or_else(dib_pixels) {
         bytes.hash(&mut hasher);
-    } else if let Some(paths) = file_paths() {
-        paths.hash(&mut hasher);
+    } else if text.is_none() {
+        if let Some(paths) = file_paths() {
+            paths.hash(&mut hasher);
+        }
     }
     hasher.finish()
 }
@@ -1107,14 +1111,31 @@ mod tests {
     }
 
     #[test]
-    fn snapshot_hash_uses_text_alone_when_there_is_text() {
-        let untouched = || -> Option<Vec<u8>> { panic!("image formats should not be read") };
+    fn snapshot_hash_counts_text_and_any_image() {
+        let no_image = || -> Option<Vec<u8>> { None };
+        let untouched = || -> Option<Vec<u8>> { panic!("DIB should not be read") };
         let no_files = || -> Option<Vec<String>> { panic!("file list should not be read") };
-        let hello = clipboard_snapshot_hash(Some("hello"), untouched, untouched, no_files);
+        let hello = clipboard_snapshot_hash(Some("hello"), no_image, no_image, no_files);
         // Same value the text-only clipboard always had.
         assert_eq!(hello, sip("hello"));
         assert_ne!(
-            clipboard_snapshot_hash(Some("world"), untouched, untouched, no_files),
+            clipboard_snapshot_hash(Some("world"), no_image, no_image, no_files),
+            hello
+        );
+        // The same caption over a different picture is a different copy.
+        let captioned =
+            clipboard_snapshot_hash(Some("hello"), || Some(vec![1, 2, 3]), untouched, no_files);
+        assert_ne!(captioned, hello);
+        assert_eq!(
+            clipboard_snapshot_hash(Some("hello"), || Some(vec![1, 2, 3]), untouched, no_files),
+            captioned
+        );
+        assert_ne!(
+            clipboard_snapshot_hash(Some("hello"), || Some(vec![1, 2, 4]), untouched, no_files),
+            captioned
+        );
+        assert_ne!(
+            clipboard_snapshot_hash(Some("hello"), no_image, || Some(vec![9u8; 16]), no_files),
             hello
         );
     }
