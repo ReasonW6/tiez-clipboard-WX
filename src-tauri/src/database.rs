@@ -28,8 +28,9 @@ pub fn is_text_type(content_type: &str) -> bool {
     matches!(content_type, "text" | "code" | "url" | "rich_text")
 }
 
+/// Leading and trailing whitespace is part of the text, so only line endings are normalized.
 pub(crate) fn normalize_text(content: &str) -> String {
-    content.trim().replace("\r\n", "\n")
+    content.replace("\r\n", "\n")
 }
 
 pub fn calc_text_hash(content: &str) -> u64 {
@@ -526,6 +527,32 @@ mod tests {
         }
         assert!(repo.enforce_limit_with_conn(&guard, None).unwrap().is_empty());
         assert!(repo.get_entry_by_id_with_conn(&guard, entry.id).unwrap().is_some());
+    }
+
+    #[test]
+    fn calc_text_hash_preserves_edge_whitespace() {
+        assert_ne!(calc_text_hash("hello"), calc_text_hash("hello "));
+        assert_ne!(calc_text_hash("hello"), calc_text_hash(" hello"));
+        assert_eq!(calc_text_hash("hello\r\n"), calc_text_hash("hello\n"));
+    }
+
+    #[test]
+    fn dedup_lookup_keeps_texts_that_differ_only_in_edge_whitespace() {
+        let conn = Arc::new(Mutex::new(setup_test_db()));
+        let repo = SqliteClipboardRepository::new(conn.clone());
+        let entry = ClipboardEntry {
+            id: 0, content_type: "text".into(), content: "hello ".into(),
+            html_content: None, source_app: "Test".into(), source_app_path: None,
+            timestamp: 1, preview: "hello ".into(), is_pinned: false,
+            tags: Vec::new(), use_count: 0,
+            is_external: false, pinned_order: 0, file_preview_exists: true,
+        };
+        let id = repo.save(&entry, None).unwrap();
+        let guard = conn.lock().unwrap();
+        let stored = repo.get_entry_by_id_with_conn(&guard, id).unwrap().unwrap();
+        assert_eq!(stored.content, "hello ");
+        assert_eq!(repo.find_by_content_with_conn(&guard, "hello ", Some("text"), None).unwrap(), Some(id));
+        assert_eq!(repo.find_by_content_with_conn(&guard, "hello", Some("text"), None).unwrap(), None);
     }
 
     #[test]

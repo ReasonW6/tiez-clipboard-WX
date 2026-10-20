@@ -625,7 +625,7 @@ pub fn start_clipboard_monitor(app_handle: AppHandle) {
                     }
 
                     if should_process {
-                        let normalized = content.trim().replace("\r\n", "\n");
+                        let normalized = content.replace("\r\n", "\n");
                         let mut hasher = std::collections::hash_map::DefaultHasher::new();
                         use std::hash::{Hash, Hasher};
                         normalized.hash(&mut hasher);

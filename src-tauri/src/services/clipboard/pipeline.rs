@@ -63,14 +63,13 @@ impl PipelineContext {
     }
 }
 
-/// Same result as `content.trim().replace("\r\n", "\n")`, but borrows when nothing changes,
-/// so multi-MB image data URLs are not copied.
+/// Same result as `content.replace("\r\n", "\n")`, but borrows when nothing changes,
+/// so multi-MB image data URLs are not copied. Leading and trailing whitespace is kept.
 fn normalize_capture_text(content: &str) -> Cow<'_, str> {
-    let trimmed = content.trim();
-    if trimmed.contains("\r\n") {
-        Cow::Owned(trimmed.replace("\r\n", "\n"))
+    if content.contains("\r\n") {
+        Cow::Owned(content.replace("\r\n", "\n"))
     } else {
-        Cow::Borrowed(trimmed)
+        Cow::Borrowed(content)
     }
 }
 
@@ -278,7 +277,7 @@ impl PipelineStage for TransformationStage {
                             ctx.should_stop = true;
                             return;
                         }
-                        entry.content = cleaned.trim().replace("\r\n", "\n");
+                        entry.content = normalize_capture_text(&cleaned).into_owned();
                         entry.preview =
                             build_entry_preview(&entry.content_type, &entry.content, None);
                     }
@@ -296,7 +295,7 @@ impl PipelineStage for TransformationStage {
                         ctx.should_stop = true;
                         return;
                     }
-                    entry.content = cleaned.trim().replace("\r\n", "\n");
+                    entry.content = normalize_capture_text(&cleaned).into_owned();
                     entry.preview = build_entry_preview(&entry.content_type, &entry.content, None);
                 }
             }
@@ -424,7 +423,7 @@ impl PipelineStage for ValidationStage {
                             return true;
                         }
                         return recent_self_copy_window
-                            && stored_content.trim().replace("\r\n", "\n") == normalized_content;
+                            && normalize_capture_text(&stored_content) == normalized_content;
                     }
                     false
                 };
@@ -696,11 +695,18 @@ mod tests {
     }
 
     #[test]
-    fn capture_normalization_matches_trim_and_crlf_replace() {
+    fn capture_normalization_matches_crlf_replace() {
         for text in ["", "  ", "plain", " padded \r\n", "a\r\nb", "a\r\r\nb", "\r\n\r\n", "data:image/png;base64,AAAA"] {
-            assert_eq!(normalize_capture_text(text), text.trim().replace("\r\n", "\n"), "{text:?}");
+            assert_eq!(normalize_capture_text(text), text.replace("\r\n", "\n"), "{text:?}");
         }
         assert!(matches!(normalize_capture_text("data:image/png;base64,AAAA"), Cow::Borrowed(_)));
+    }
+
+    #[test]
+    fn capture_normalization_preserves_edge_whitespace() {
+        assert_eq!(normalize_capture_text("hello "), "hello ");
+        assert_eq!(normalize_capture_text(" hello"), " hello");
+        assert_eq!(normalize_capture_text("\thello\r\n"), "\thello\n");
     }
 
     #[test]
