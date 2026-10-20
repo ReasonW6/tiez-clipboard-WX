@@ -8,7 +8,9 @@ use crate::infrastructure::windows_api::window_tracker::{
 use crate::services::clipboard::utils::*;
 use base64::Engine;
 use std::borrow::Cow;
+use std::collections::BTreeMap;
 use std::sync::atomic::Ordering;
+use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager};
 
@@ -78,6 +80,43 @@ fn ensure_image_hash(image_hash: &mut Option<i64>, entry: &ClipboardEntry) -> Op
         *image_hash = calc_image_hash(&entry.content);
     }
     *image_hash
+}
+
+/// Visual hashes of inline session images, keyed by a hash of the data URL, so each picture is
+/// decoded once instead of on every later image capture. The key follows the content, so an
+/// entry that is edited, deleted or re-numbered can never be matched with a stale hash.
+static SESSION_IMAGE_HASHES: Mutex<BTreeMap<u64, Option<i64>>> = Mutex::new(BTreeMap::new());
+/// Keys of deleted or edited entries stay until the memo is full; then it starts over.
+/// The session itself holds at most 500 entries.
+const SESSION_IMAGE_HASH_LIMIT: usize = 1000;
+
+fn session_image_key(content: &str) -> u64 {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    let mut hasher = DefaultHasher::new();
+    content.hash(&mut hasher);
+    hasher.finish()
+}
+
+fn remember_session_image_hash(memo: &mut BTreeMap<u64, Option<i64>>, key: u64, hash: Option<i64>) {
+    if memo.len() >= SESSION_IMAGE_HASH_LIMIT {
+        memo.clear();
+    }
+    memo.insert(key, hash);
+}
+
+/// `calc_image_hash` through the memo. A file path is read again each time: the file can change.
+fn session_image_hash(memo: &mut BTreeMap<u64, Option<i64>>, content: &str) -> Option<i64> {
+    if !content.starts_with("data:") {
+        return calc_image_hash(content);
+    }
+    let key = session_image_key(content);
+    if let Some(hash) = memo.get(&key) {
+        return *hash;
+    }
+    let hash = calc_image_hash(content);
+    remember_session_image_hash(memo, key, hash);
+    hash
 }
 
 pub trait PipelineStage {
@@ -450,6 +489,7 @@ impl PipelineStage for ValidationStage {
                 let session = session_history.0.lock().unwrap();
                 let entry = ctx.entry.as_ref().expect("entry exists");
                 let normalized_content = normalize_capture_text(&entry.content);
+                let mut image_hashes = SESSION_IMAGE_HASHES.lock().unwrap();
                 for item in session.iter() {
                     let item_normalized = normalize_capture_text(&item.content);
                     let rich_text_match =
@@ -468,14 +508,22 @@ impl PipelineStage for ValidationStage {
                     let image_match = !text_match
                         && entry.content_type == "image"
                         && item.content_type == "image"
-                        && ensure_image_hash(&mut ctx.image_hash, entry)
-                            .is_some_and(|hash| calc_image_hash(&item.content) == Some(hash));
+                        && ensure_image_hash(&mut ctx.image_hash, entry).is_some_and(|hash| {
+                            session_image_hash(&mut image_hashes, &item.content) == Some(hash)
+                        });
                     let match_found = image_match || text_match;
                     if match_found {
                         removed_ids.push(item.id);
                         if !persistent_enabled {
                             reuse_session_id = Some(item.id);
                         }
+                    }
+                }
+                // A session-only capture joins the session as is: spare the next capture a decode.
+                if !persistent_enabled && entry.content.starts_with("data:") {
+                    if let Some(hash) = ctx.image_hash {
+                        let key = session_image_key(&entry.content);
+                        remember_session_image_hash(&mut image_hashes, key, Some(hash));
                     }
                 }
             }
@@ -628,10 +676,15 @@ impl PipelineStage for DistributionStage {
 
 #[cfg(test)]
 mod tests {
-    use super::{ensure_image_hash, normalize_capture_text};
+    use super::{
+        ensure_image_hash, normalize_capture_text, remember_session_image_hash, session_image_hash,
+        SESSION_IMAGE_HASH_LIMIT,
+    };
     use crate::database::calc_image_hash;
     use crate::domain::models::ClipboardEntry;
+    use image::codecs::png::{CompressionType, FilterType, PngEncoder};
     use std::borrow::Cow;
+    use std::collections::BTreeMap;
 
     fn entry(content_type: &str, content: &str) -> ClipboardEntry {
         ClipboardEntry {
@@ -662,5 +715,73 @@ mod tests {
 
         let mut none = None;
         assert_eq!(ensure_image_hash(&mut none, &entry("text", "data:image/png;base64,AAAA")), None);
+    }
+
+    fn png(seed: u8, compression: CompressionType) -> Vec<u8> {
+        use image::ImageEncoder;
+        let pixels: Vec<u8> = (0..64u32 * 48 * 4).map(|i| (i as u8).wrapping_mul(seed)).collect();
+        let mut png = Vec::new();
+        PngEncoder::new_with_quality(&mut png, compression, FilterType::Adaptive)
+            .write_image(&pixels, 64, 48, image::ExtendedColorType::Rgba8)
+            .unwrap();
+        png
+    }
+
+    fn data_url(png: &[u8]) -> String {
+        use base64::Engine;
+        format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(png))
+    }
+
+    #[test]
+    fn session_image_hash_matches_by_pixels_not_by_entry() {
+        let stored = data_url(&png(3, CompressionType::Fast));
+        let recopied = data_url(&png(3, CompressionType::Best));
+        assert_ne!(stored, recopied);
+        let mut memo = BTreeMap::new();
+        let hash = session_image_hash(&mut memo, &stored);
+        assert!(hash.is_some());
+        assert_eq!(hash, calc_image_hash(&stored));
+        assert_eq!(session_image_hash(&mut memo, &recopied), hash);
+        // What an edited entry looks like: same id, new content. It must not keep the old hash.
+        let edited = data_url(&png(5, CompressionType::Fast));
+        assert_eq!(session_image_hash(&mut memo, &edited), calc_image_hash(&edited));
+        assert_ne!(session_image_hash(&mut memo, &edited), hash);
+    }
+
+    #[test]
+    fn session_image_hash_decodes_each_content_once() {
+        let url = data_url(&png(3, CompressionType::Fast));
+        let mut memo = BTreeMap::new();
+        assert_eq!(session_image_hash(&mut memo, &url), calc_image_hash(&url));
+        // A planted value shows the second lookup reads the memo instead of decoding again.
+        *memo.values_mut().next().unwrap() = Some(42);
+        assert_eq!(session_image_hash(&mut memo, &url), Some(42));
+    }
+
+    #[test]
+    fn session_image_hash_rereads_image_files() {
+        // A GIF copied as a file stays a path in the session, and the file can change on disk.
+        let dir = std::env::temp_dir().join(format!("tiez-session-image-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("copied.png");
+        let path_text = path.to_string_lossy().to_string();
+        let mut memo = BTreeMap::new();
+        std::fs::write(&path, png(3, CompressionType::Fast)).unwrap();
+        let first = session_image_hash(&mut memo, &path_text);
+        std::fs::write(&path, png(5, CompressionType::Fast)).unwrap();
+        let second = session_image_hash(&mut memo, &path_text);
+        assert_eq!(second, calc_image_hash(&path_text));
+        assert_ne!(first, second);
+        assert!(memo.is_empty());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn session_image_hash_memo_stays_bounded() {
+        let mut memo = BTreeMap::new();
+        for key in 0..SESSION_IMAGE_HASH_LIMIT as u64 * 3 {
+            remember_session_image_hash(&mut memo, key, None);
+            assert!(memo.len() <= SESSION_IMAGE_HASH_LIMIT);
+        }
     }
 }
