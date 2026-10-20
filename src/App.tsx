@@ -618,7 +618,7 @@ const App = () => {
     }
 
     invoke<ClipboardEntry[]>("get_clipboard_history", {
-      limit: 256,
+      limit: QUICK_PASTE_KEYS.length,
       offset: 0,
       contentType: null
     })

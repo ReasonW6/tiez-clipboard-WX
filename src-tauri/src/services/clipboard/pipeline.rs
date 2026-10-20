@@ -1,13 +1,16 @@
 use crate::app_state::{AppDataDir, PasteQueue, SessionHistory, SettingsState};
 use crate::database::DbState;
-use crate::database::{calc_image_hash, is_text_type};
+use crate::database::{calc_image_hash, is_text_type, save_image_to_file};
 use crate::domain::models::ClipboardEntry;
 use crate::infrastructure::windows_api::window_tracker::{
     get_clipboard_source_app_info, ActiveAppInfo,
 };
 use crate::services::clipboard::utils::*;
 use base64::Engine;
+use std::borrow::Cow;
+use std::collections::BTreeMap;
 use std::sync::atomic::Ordering;
+use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager};
 
@@ -29,6 +32,8 @@ pub struct PipelineContext {
     pub should_stop: bool,
     pub pending_removals: Vec<i64>,
     pub reuse_session_id: Option<i64>,
+    /// Visual hash of an image entry; see `ensure_image_hash`.
+    pub image_hash: Option<i64>,
 }
 
 impl PipelineContext {
@@ -53,8 +58,65 @@ impl PipelineContext {
             should_stop: false,
             pending_removals: Vec::new(),
             reuse_session_id: None,
+            image_hash: None,
         }
     }
+}
+
+/// Same result as `content.trim().replace("\r\n", "\n")`, but borrows when nothing changes,
+/// so multi-MB image data URLs are not copied.
+fn normalize_capture_text(content: &str) -> Cow<'_, str> {
+    let trimmed = content.trim();
+    if trimmed.contains("\r\n") {
+        Cow::Owned(trimmed.replace("\r\n", "\n"))
+    } else {
+        Cow::Borrowed(trimmed)
+    }
+}
+
+/// The visual hash needs a full image decode: do it once per capture, before taking the DB lock.
+fn ensure_image_hash(image_hash: &mut Option<i64>, entry: &ClipboardEntry) -> Option<i64> {
+    if image_hash.is_none() && entry.content_type == "image" {
+        *image_hash = calc_image_hash(&entry.content);
+    }
+    *image_hash
+}
+
+/// Visual hashes of inline session images, keyed by a hash of the data URL, so each picture is
+/// decoded once instead of on every later image capture. The key follows the content, so an
+/// entry that is edited, deleted or re-numbered can never be matched with a stale hash.
+static SESSION_IMAGE_HASHES: Mutex<BTreeMap<u64, Option<i64>>> = Mutex::new(BTreeMap::new());
+/// Keys of deleted or edited entries stay until the memo is full; then it starts over.
+/// The session itself holds at most 500 entries.
+const SESSION_IMAGE_HASH_LIMIT: usize = 1000;
+
+fn session_image_key(content: &str) -> u64 {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    let mut hasher = DefaultHasher::new();
+    content.hash(&mut hasher);
+    hasher.finish()
+}
+
+fn remember_session_image_hash(memo: &mut BTreeMap<u64, Option<i64>>, key: u64, hash: Option<i64>) {
+    if memo.len() >= SESSION_IMAGE_HASH_LIMIT {
+        memo.clear();
+    }
+    memo.insert(key, hash);
+}
+
+/// `calc_image_hash` through the memo. A file path is read again each time: the file can change.
+fn session_image_hash(memo: &mut BTreeMap<u64, Option<i64>>, content: &str) -> Option<i64> {
+    if !content.starts_with("data:") {
+        return calc_image_hash(content);
+    }
+    let key = session_image_key(content);
+    if let Some(hash) = memo.get(&key) {
+        return *hash;
+    }
+    let hash = calc_image_hash(content);
+    remember_session_image_hash(memo, key, hash);
+    hash
 }
 
 pub trait PipelineStage {
@@ -185,7 +247,10 @@ impl PipelineStage for TransformationStage {
         let settings = ctx.app_handle.state::<SettingsState>();
 
         // Normalization (already partially done but let's be thorough)
-        entry.content = entry.content.trim().replace("\r\n", "\n");
+        let normalized = normalize_capture_text(&entry.content);
+        if normalized.len() != entry.content.len() {
+            entry.content = normalized.into_owned();
+        }
 
         let app_cleanup_policies_raw = settings.app_cleanup_policies.lock().unwrap().clone();
         if !app_cleanup_policies_raw.trim().is_empty() {
@@ -313,9 +378,7 @@ impl PipelineStage for ValidationStage {
         if settings.deduplicate.load(Ordering::Relaxed) {
             let persistent_enabled = settings.persistent.load(Ordering::Relaxed);
             let db_state = ctx.app_handle.state::<DbState>();
-            let conn = db_state.conn.lock().unwrap();
 
-            let mut existing_id = None;
             let (content, content_type, html_content) = {
                 let e = ctx.entry.as_ref().unwrap();
                 (
@@ -326,7 +389,7 @@ impl PipelineStage for ValidationStage {
             };
 
             // Try precise match and normalized match
-            let normalized_content = content.trim().replace("\r\n", "\n");
+            let normalized_content = normalize_capture_text(&content);
             let normalized_html = |html: &str| html.trim().replace("\r\n", "\n");
             let recent_self_copy_window = {
                 let last_app_time = crate::LAST_APP_SET_TIMESTAMP.load(Ordering::Relaxed);
@@ -343,62 +406,73 @@ impl PipelineStage for ValidationStage {
                     _ => false,
                 }
             };
-            let rich_text_html_matches = |id: i64| -> bool {
-                if let Ok(Some((stored_content, c_type, h_content))) = db_state
-                    .repo
-                    .get_entry_content_with_html_with_conn(&conn, id)
-                {
-                    if c_type != "rich_text" {
-                        return false;
-                    }
-                    if htmls_equivalent(html_content.as_deref(), h_content.as_deref()) {
-                        return true;
-                    }
-                    return recent_self_copy_window
-                        && stored_content.trim().replace("\r\n", "\n") == normalized_content;
-                }
-                false
-            };
-
-            // For rich text, we want to deduplicate against all text types
-            let types_to_check = if content_type == "rich_text" {
-                vec!["rich_text", "text", "code", "url"]
-            } else {
-                vec![content_type.as_str()]
-            };
-
-            for t in types_to_check {
-                if let Ok(Some(id)) =
-                    db_state
-                        .repo
-                        .find_by_content_with_conn(&conn, &content, Some(t))
-                {
-                    if content_type == "rich_text"
-                        && t == "rich_text"
-                        && !rich_text_html_matches(id)
-                    {
-                        continue;
-                    }
-                    existing_id = Some(id);
-                    break;
-                }
-                if let Ok(Some(id)) =
-                    db_state
-                        .repo
-                        .find_by_content_with_conn(&conn, &normalized_content, Some(t))
-                {
-                    if content_type == "rich_text"
-                        && t == "rich_text"
-                        && !rich_text_html_matches(id)
-                    {
-                        continue;
-                    }
-                    existing_id = Some(id);
-                    break;
-                }
-            }
-
+            // Only persistent mode acts on a stored match, so only it needs the DB lock.
             if persistent_enabled {
+                let image_hash =
+                    ensure_image_hash(&mut ctx.image_hash, ctx.entry.as_ref().unwrap());
+                let conn = db_state.conn.lock().unwrap();
+                let mut existing_id = None;
+                let rich_text_html_matches = |id: i64| -> bool {
+                    if let Ok(Some((stored_content, c_type, h_content))) = db_state
+                        .repo
+                        .get_entry_content_with_html_with_conn(&conn, id)
+                    {
+                        if c_type != "rich_text" {
+                            return false;
+                        }
+                        if htmls_equivalent(html_content.as_deref(), h_content.as_deref()) {
+                            return true;
+                        }
+                        return recent_self_copy_window
+                            && stored_content.trim().replace("\r\n", "\n") == normalized_content;
+                    }
+                    false
+                };
+
+                // For rich text, we want to deduplicate against all text types
+                let types_to_check = if content_type == "rich_text" {
+                    vec!["rich_text", "text", "code", "url"]
+                } else {
+                    vec![content_type.as_str()]
+                };
+
+                for t in types_to_check {
+                    if let Ok(Some(id)) = db_state.repo.find_by_content_with_conn(
+                        &conn,
+                        &content,
+                        Some(t),
+                        image_hash,
+                    ) {
+                        if content_type == "rich_text"
+                            && t == "rich_text"
+                            && !rich_text_html_matches(id)
+                        {
+                            continue;
+                        }
+                        existing_id = Some(id);
+                        break;
+                    }
+                    // Normalization only shortens, so equal length means the same query again.
+                    if normalized_content.len() == content.len() {
+                        continue;
+                    }
+                    if let Ok(Some(id)) = db_state.repo.find_by_content_with_conn(
+                        &conn,
+                        &normalized_content,
+                        Some(t),
+                        image_hash,
+                    ) {
+                        if content_type == "rich_text"
+                            && t == "rich_text"
+                            && !rich_text_html_matches(id)
+                        {
+                            continue;
+                        }
+                        existing_id = Some(id);
+                        break;
+                    }
+                }
+
                 if let Some(id) = existing_id {
                     // Instead of deleting, we set the entry ID so PersistenceStage performs an UPDATE
                     // This ensures the item is "moved to top" without risking data loss
@@ -414,14 +488,10 @@ impl PipelineStage for ValidationStage {
             {
                 let session = session_history.0.lock().unwrap();
                 let entry = ctx.entry.as_ref().expect("entry exists");
-                let normalized_content = entry.content.trim().replace("\r\n", "\n");
-                let entry_image_hash = if entry.content_type == "image" {
-                    calc_image_hash(&entry.content)
-                } else {
-                    None
-                };
+                let normalized_content = normalize_capture_text(&entry.content);
+                let mut image_hashes = SESSION_IMAGE_HASHES.lock().unwrap();
                 for item in session.iter() {
-                    let item_normalized = item.content.trim().replace("\r\n", "\n");
+                    let item_normalized = normalize_capture_text(&item.content);
                     let rich_text_match =
                         if entry.content_type == "rich_text" && item.content_type == "rich_text" {
                             htmls_equivalent(
@@ -431,19 +501,29 @@ impl PipelineStage for ValidationStage {
                         } else {
                             true
                         };
-                    let image_match = entry.content_type == "image"
-                        && item.content_type == "image"
-                        && entry_image_hash.is_some()
-                        && calc_image_hash(&item.content) == entry_image_hash;
                     let text_match = (item.content == entry.content
                         || item_normalized == normalized_content)
                         && rich_text_match;
+                    // Decoding is the costly part, so pictures that already match as text skip it.
+                    let image_match = !text_match
+                        && entry.content_type == "image"
+                        && item.content_type == "image"
+                        && ensure_image_hash(&mut ctx.image_hash, entry).is_some_and(|hash| {
+                            session_image_hash(&mut image_hashes, &item.content) == Some(hash)
+                        });
                     let match_found = image_match || text_match;
                     if match_found {
                         removed_ids.push(item.id);
                         if !persistent_enabled {
                             reuse_session_id = Some(item.id);
                         }
+                    }
+                }
+                // A session-only capture joins the session as is: spare the next capture a decode.
+                if !persistent_enabled && entry.content.starts_with("data:") {
+                    if let Some(hash) = ctx.image_hash {
+                        let key = session_image_key(&entry.content);
+                        remember_session_image_hash(&mut image_hashes, key, Some(hash));
                     }
                 }
             }
@@ -472,9 +552,21 @@ impl PipelineStage for PersistenceStage {
         if settings.persistent.load(Ordering::Relaxed) {
             let app_data_dir = ctx.app_handle.state::<AppDataDir>();
             let data_dir = app_data_dir.0.lock().unwrap().clone();
+            // Hash and write the image file first; queries wait on the DB lock below.
+            let image_hash = ensure_image_hash(&mut ctx.image_hash, entry);
+            if entry.content_type == "image" && entry.content.starts_with("data:image/") {
+                if let Some(path) = save_image_to_file(&entry.content, &data_dir) {
+                    entry.content = path;
+                    entry.is_external = true;
+                }
+            }
             let conn = db_state.conn.lock().unwrap();
 
-            if let Ok(id) = db_state.repo.save_capture_with_conn(&conn, entry, Some(&data_dir)) {
+            if let Ok(id) =
+                db_state
+                    .repo
+                    .save_capture_with_conn(&conn, entry, Some(&data_dir), image_hash)
+            {
                 entry.id = id;
                 if let Ok(deleted_ids) = db_state
                     .repo
@@ -579,5 +671,117 @@ impl PipelineStage for DistributionStage {
             .app_handle
             .emit("clipboard-updated", truncate_entry_for_ui(entry.clone()));
 
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        ensure_image_hash, normalize_capture_text, remember_session_image_hash, session_image_hash,
+        SESSION_IMAGE_HASH_LIMIT,
+    };
+    use crate::database::calc_image_hash;
+    use crate::domain::models::ClipboardEntry;
+    use image::codecs::png::{CompressionType, FilterType, PngEncoder};
+    use std::borrow::Cow;
+    use std::collections::BTreeMap;
+
+    fn entry(content_type: &str, content: &str) -> ClipboardEntry {
+        ClipboardEntry {
+            id: 0, content_type: content_type.into(), content: content.into(),
+            html_content: None, source_app: "Test".into(), source_app_path: None,
+            timestamp: 1, preview: String::new(), is_pinned: false, tags: Vec::new(),
+            use_count: 0, is_external: false, pinned_order: 0, file_preview_exists: true,
+        }
+    }
+
+    #[test]
+    fn capture_normalization_matches_trim_and_crlf_replace() {
+        for text in ["", "  ", "plain", " padded \r\n", "a\r\nb", "a\r\r\nb", "\r\n\r\n", "data:image/png;base64,AAAA"] {
+            assert_eq!(normalize_capture_text(text), text.trim().replace("\r\n", "\n"), "{text:?}");
+        }
+        assert!(matches!(normalize_capture_text("data:image/png;base64,AAAA"), Cow::Borrowed(_)));
+    }
+
+    #[test]
+    fn image_hash_is_computed_once_and_only_for_images() {
+        let mut image = entry("image", "data:image/png;base64,AAAA");
+        let mut cached = None;
+        let first = ensure_image_hash(&mut cached, &image);
+        assert!(first.is_some());
+        assert_eq!(first, calc_image_hash(&image.content));
+        image.content = "data:image/png;base64,BBBB".into();
+        assert_eq!(ensure_image_hash(&mut cached, &image), first);
+
+        let mut none = None;
+        assert_eq!(ensure_image_hash(&mut none, &entry("text", "data:image/png;base64,AAAA")), None);
+    }
+
+    fn png(seed: u8, compression: CompressionType) -> Vec<u8> {
+        use image::ImageEncoder;
+        let pixels: Vec<u8> = (0..64u32 * 48 * 4).map(|i| (i as u8).wrapping_mul(seed)).collect();
+        let mut png = Vec::new();
+        PngEncoder::new_with_quality(&mut png, compression, FilterType::Adaptive)
+            .write_image(&pixels, 64, 48, image::ExtendedColorType::Rgba8)
+            .unwrap();
+        png
+    }
+
+    fn data_url(png: &[u8]) -> String {
+        use base64::Engine;
+        format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(png))
+    }
+
+    #[test]
+    fn session_image_hash_matches_by_pixels_not_by_entry() {
+        let stored = data_url(&png(3, CompressionType::Fast));
+        let recopied = data_url(&png(3, CompressionType::Best));
+        assert_ne!(stored, recopied);
+        let mut memo = BTreeMap::new();
+        let hash = session_image_hash(&mut memo, &stored);
+        assert!(hash.is_some());
+        assert_eq!(hash, calc_image_hash(&stored));
+        assert_eq!(session_image_hash(&mut memo, &recopied), hash);
+        // What an edited entry looks like: same id, new content. It must not keep the old hash.
+        let edited = data_url(&png(5, CompressionType::Fast));
+        assert_eq!(session_image_hash(&mut memo, &edited), calc_image_hash(&edited));
+        assert_ne!(session_image_hash(&mut memo, &edited), hash);
+    }
+
+    #[test]
+    fn session_image_hash_decodes_each_content_once() {
+        let url = data_url(&png(3, CompressionType::Fast));
+        let mut memo = BTreeMap::new();
+        assert_eq!(session_image_hash(&mut memo, &url), calc_image_hash(&url));
+        // A planted value shows the second lookup reads the memo instead of decoding again.
+        *memo.values_mut().next().unwrap() = Some(42);
+        assert_eq!(session_image_hash(&mut memo, &url), Some(42));
+    }
+
+    #[test]
+    fn session_image_hash_rereads_image_files() {
+        // A GIF copied as a file stays a path in the session, and the file can change on disk.
+        let dir = std::env::temp_dir().join(format!("tiez-session-image-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("copied.png");
+        let path_text = path.to_string_lossy().to_string();
+        let mut memo = BTreeMap::new();
+        std::fs::write(&path, png(3, CompressionType::Fast)).unwrap();
+        let first = session_image_hash(&mut memo, &path_text);
+        std::fs::write(&path, png(5, CompressionType::Fast)).unwrap();
+        let second = session_image_hash(&mut memo, &path_text);
+        assert_eq!(second, calc_image_hash(&path_text));
+        assert_ne!(first, second);
+        assert!(memo.is_empty());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn session_image_hash_memo_stays_bounded() {
+        let mut memo = BTreeMap::new();
+        for key in 0..SESSION_IMAGE_HASH_LIMIT as u64 * 3 {
+            remember_session_image_hash(&mut memo, key, None);
+            assert!(memo.len() <= SESSION_IMAGE_HASH_LIMIT);
+        }
     }
 }

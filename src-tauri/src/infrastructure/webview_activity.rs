@@ -25,6 +25,9 @@ const SLEEP_TIMER_ID: usize = 0x5445_5a58;
 // frame is what appears first when the window is shown again, so let it paint
 // that reset state, including the header's layout animation, before sleeping.
 const SLEEP_DELAY_MS: u32 = 600;
+// A window that starts hidden has never painted, so its first show would wait
+// for a cold first frame. Let the page load and paint once before sleeping.
+const STARTUP_SLEEP_DELAY_MS: u32 = 5000;
 
 thread_local! {
     // The controller and the subclass both live on the window's UI thread.
@@ -40,7 +43,13 @@ pub fn install(window: &WebviewWindow) {
         CONTROLLER.with(|slot| *slot.borrow_mut() = Some(webview.controller()));
         unsafe {
             if SetWindowSubclass(hwnd, Some(subclass_proc), SUBCLASS_ID, 0).as_bool() {
-                set_active(IsWindowVisible(hwnd).as_bool());
+                if IsWindowVisible(hwnd).as_bool() {
+                    set_active(true);
+                } else if SetTimer(Some(hwnd), SLEEP_TIMER_ID, STARTUP_SLEEP_DELAY_MS, None) == 0 {
+                    set_active(false);
+                }
+                // Catch a show or hide that happened before the subclass was in place.
+                crate::app::hooks::refresh_mouse_hook();
             }
         }
     });
@@ -98,6 +107,12 @@ unsafe extern "system" fn subclass_proc(
             if SetTimer(Some(hwnd), SLEEP_TIMER_ID, SLEEP_DELAY_MS, None) == 0 {
                 set_active(false);
             }
+        }
+        // The mouse hook is only needed while the window is visible.
+        if msg == WM_WINDOWPOSCHANGED
+            && (flags.contains(SWP_SHOWWINDOW) || flags.contains(SWP_HIDEWINDOW))
+        {
+            crate::app::hooks::refresh_mouse_hook();
         }
     }
     if msg == WM_TIMER && wparam.0 == SLEEP_TIMER_ID {

@@ -28,7 +28,7 @@ pub fn is_text_type(content_type: &str) -> bool {
     matches!(content_type, "text" | "code" | "url" | "rich_text")
 }
 
-fn normalize_text(content: &str) -> String {
+pub(crate) fn normalize_text(content: &str) -> String {
     content.trim().replace("\r\n", "\n")
 }
 
@@ -508,7 +508,7 @@ mod tests {
         captured.tags.clear();
         captured.timestamp = 2;
         let guard = conn.lock().unwrap();
-        repo.save_capture_with_conn(&guard, &mut captured, None).unwrap();
+        repo.save_capture_with_conn(&guard, &mut captured, None, None).unwrap();
         assert_eq!(captured.id, entry.id);
         assert_eq!(captured.tags, entry.tags);
         assert_eq!(captured.content, entry.content);
@@ -545,7 +545,7 @@ mod tests {
         captured.pinned_order = 0;
         captured.tags = vec!["sensitive".into()];
         let guard = conn.lock().unwrap();
-        repo.save_capture_with_conn(&guard, &mut captured, None).unwrap();
+        repo.save_capture_with_conn(&guard, &mut captured, None, None).unwrap();
         assert!(captured.is_pinned);
         assert_eq!(captured.pinned_order, 7);
         assert_eq!(captured.tags, vec!["work", "sensitive"]);

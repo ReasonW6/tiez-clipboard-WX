@@ -49,6 +49,10 @@ pub(crate) fn sync_registered_hotkeys(app_handle: &AppHandle) -> AppResult<()> {
     let search_hotkey = settings.search_hotkey.lock().unwrap().clone();
     register_shortcut(app_handle, &search_hotkey);
 
+    // A middle-button main hotkey keeps the mouse hook installed while the window is hidden.
+    #[cfg(target_os = "windows")]
+    crate::app::hooks::refresh_mouse_hook();
+
     Ok(())
 }
 

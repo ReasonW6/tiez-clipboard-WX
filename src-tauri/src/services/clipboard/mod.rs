@@ -27,7 +27,8 @@ fn clear_recent_image_echo_state() {
     crate::LAST_APP_SET_IMAGE_VISUAL_HASH.store(0, Ordering::SeqCst);
 }
 
-fn should_ignore_recent_image_echo(raw_hash: u64, visual_hash: u64) -> bool {
+/// `visual_hash` decodes the whole image, so it runs only when the raw hashes cannot decide.
+fn should_ignore_recent_image_echo(raw_hash: u64, visual_hash: impl FnOnce() -> u64) -> bool {
     let last_app_hash = crate::LAST_APP_SET_HASH.load(Ordering::SeqCst);
     let last_app_hash_alt = crate::LAST_APP_SET_HASH_ALT.load(Ordering::SeqCst);
     let last_app_visual_hash = crate::LAST_APP_SET_IMAGE_VISUAL_HASH.load(Ordering::SeqCst);
@@ -42,7 +43,41 @@ fn should_ignore_recent_image_echo(raw_hash: u64, visual_hash: u64) -> bool {
     }
 
     ((last_app_hash != 0) && (last_app_hash == raw_hash || last_app_hash_alt == raw_hash))
-        || ((visual_hash != 0) && last_app_visual_hash == visual_hash)
+        || ((last_app_visual_hash != 0) && last_app_visual_hash == visual_hash())
+}
+
+/// Hash for the short same-content window. Text and image both count, the image through the
+/// source's own PNG/JPEG bytes before the far larger DIB pixels; a copied file list
+/// (CF_HDROP) decides only when there is neither.
+fn clipboard_snapshot_hash(
+    text: Option<&str>,
+    native_image: impl FnOnce() -> Option<Vec<u8>>,
+    dib_pixels: impl FnOnce() -> Option<Vec<u8>>,
+    file_paths: impl FnOnce() -> Option<Vec<String>>,
+) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    let text = text.filter(|text| !text.trim().is_empty());
+    if let Some(text) = text {
+        text.hash(&mut hasher);
+    }
+    if let Some(bytes) = native_image().or_else(dib_pixels) {
+        bytes.hash(&mut hasher);
+    } else if text.is_none() {
+        if let Some(paths) = file_paths() {
+            paths.hash(&mut hasher);
+        }
+    }
+    hasher.finish()
+}
+
+unsafe fn read_native_clipboard_image() -> Option<Vec<u8>> {
+    ["PNG", "image/png", "JFIF", "JPEG", "image/jpeg"]
+        .iter()
+        .find_map(|name| {
+            crate::infrastructure::windows_api::win_clipboard::get_clipboard_raw_format(name)
+                .filter(|raw| !raw.is_empty())
+        })
 }
 
 fn should_capture_file_entries(capture_files_enabled: bool) -> bool {
@@ -541,22 +576,14 @@ pub fn start_clipboard_monitor(app_handle: AppHandle) {
             .as_millis() as u64;
 
         // Calculate hash of current clipboard content
-        let current_content_hash = {
-            use std::hash::{Hash, Hasher};
-            let mut hasher = std::collections::hash_map::DefaultHasher::new();
-
-            // Hash text content if available
-            if let Some(text) = read_clipboard_text_once(&mut clipboard, &mut cached_text) {
-                normalize_clipboard_plain_text(&text).hash(&mut hasher);
-            }
-
-            // Also consider image hash if present
-            if let Some(image) = read_clipboard_image_once(&mut cached_image) {
-                image.bytes.hash(&mut hasher);
-            }
-
-            hasher.finish()
-        };
+        let current_content_hash = clipboard_snapshot_hash(
+            read_clipboard_text_once(&mut clipboard, &mut cached_text)
+                .map(|text| normalize_clipboard_plain_text(&text))
+                .as_deref(),
+            || unsafe { read_native_clipboard_image() },
+            || read_clipboard_image_once(&mut cached_image).map(|image| image.bytes),
+            || unsafe { crate::infrastructure::windows_api::win_clipboard::get_clipboard_files() },
+        );
 
         // If content is identical to last processed content within 2000ms window, skip.
         // Rich text sources (Office/WPS) may fire multiple clipboard events over >500ms
@@ -589,7 +616,7 @@ pub fn start_clipboard_monitor(app_handle: AppHandle) {
                             if let Ok(conn) = db_state.conn.lock() {
                                 if let Ok(None) = db_state
                                     .repo
-                                    .find_by_content_with_conn(&conn, &content, None)
+                                    .find_by_content_with_conn(&conn, &content, None, None)
                                 {
                                     should_process = true;
                                 }
@@ -820,12 +847,12 @@ pub fn start_clipboard_monitor(app_handle: AppHandle) {
                     use std::hash::{Hash, Hasher};
                     gif_data.hash(&mut hasher);
                     let hash = hasher.finish();
-                    let visual_hash =
-                        calc_image_hash_from_bytes(&gif_data).unwrap_or(hash as i64) as u64;
                     handled = true;
 
                     if hash != monitor_state.last_image_hash {
-                        if should_ignore_recent_image_echo(hash, visual_hash) {
+                        if should_ignore_recent_image_echo(hash, || {
+                            calc_image_hash_from_bytes(&gif_data).unwrap_or(hash as i64) as u64
+                        }) {
                             clear_recent_image_echo_state();
                         } else {
                             let b64 = base64::engine::general_purpose::STANDARD.encode(gif_data);
@@ -846,11 +873,12 @@ pub fn start_clipboard_monitor(app_handle: AppHandle) {
                     use std::hash::{Hash, Hasher};
                     data_url.hash(&mut hasher);
                     let hash = hasher.finish();
-                    let visual_hash = calc_image_hash(&data_url).unwrap_or(hash as i64) as u64;
                     handled = true;
 
                     if hash != monitor_state.last_image_hash {
-                        if should_ignore_recent_image_echo(hash, visual_hash) {
+                        if should_ignore_recent_image_echo(hash, || {
+                            calc_image_hash(&data_url).unwrap_or(hash as i64) as u64
+                        }) {
                             clear_recent_image_echo_state();
                         } else {
                             process_new_entry(
@@ -869,7 +897,7 @@ pub fn start_clipboard_monitor(app_handle: AppHandle) {
                     // Fast path: try native PNG/JPEG clipboard formats first.
                     // Browsers often provide these alongside CF_DIB, and using
                     // them directly avoids the expensive bitmap → PNG encode.
-                    let fast_data_url: Option<(String, u64, u64)> = {
+                    let fast_data_url: Option<(String, u64, Vec<u8>)> = {
                         use std::hash::{Hash, Hasher};
                         let mut result = None;
                         for name in ["PNG", "image/png", "JFIF", "JPEG", "image/jpeg"] {
@@ -880,13 +908,11 @@ pub fn start_clipboard_monitor(app_handle: AppHandle) {
                                     let mut hasher = std::collections::hash_map::DefaultHasher::new();
                                     raw.hash(&mut hasher);
                                     let hash = hasher.finish();
-                                    let visual_hash =
-                                        calc_image_hash_from_bytes(&raw).unwrap_or(hash as i64) as u64;
                                     let b64 = base64::engine::general_purpose::STANDARD.encode(&raw);
                                     result = Some((
                                         format!("data:image/png;base64,{}", b64),
                                         hash,
-                                        visual_hash,
+                                        raw,
                                     ));
                                     break;
                                 }
@@ -894,13 +920,11 @@ pub fn start_clipboard_monitor(app_handle: AppHandle) {
                                     let mut hasher = std::collections::hash_map::DefaultHasher::new();
                                     raw.hash(&mut hasher);
                                     let hash = hasher.finish();
-                                    let visual_hash =
-                                        calc_image_hash_from_bytes(&raw).unwrap_or(hash as i64) as u64;
                                     let b64 = base64::engine::general_purpose::STANDARD.encode(&raw);
                                     result = Some((
                                         format!("data:image/jpeg;base64,{}", b64),
                                         hash,
-                                        visual_hash,
+                                        raw,
                                     ));
                                     break;
                                 }
@@ -909,9 +933,11 @@ pub fn start_clipboard_monitor(app_handle: AppHandle) {
                         result
                     };
 
-                    if let Some((data_url, hash, visual_hash)) = fast_data_url {
+                    if let Some((data_url, hash, raw)) = fast_data_url {
                         if hash != monitor_state.last_image_hash {
-                            if should_ignore_recent_image_echo(hash, visual_hash) {
+                            if should_ignore_recent_image_echo(hash, || {
+                                calc_image_hash_from_bytes(&raw).unwrap_or(hash as i64) as u64
+                            }) {
                                 clear_recent_image_echo_state();
                                 handled = true;
                             } else {
@@ -936,16 +962,17 @@ pub fn start_clipboard_monitor(app_handle: AppHandle) {
                             let mut hasher = std::collections::hash_map::DefaultHasher::new();
                             image.bytes.hash(&mut hasher);
                             let hash = hasher.finish();
-                            let visual_hash = calc_image_hash_from_rgba(
-                                image.width as u32,
-                                image.height as u32,
-                                &image.bytes,
-                            )
-                            .unwrap_or(hash as i64)
-                                as u64;
 
                             if hash != monitor_state.last_image_hash {
-                                if should_ignore_recent_image_echo(hash, visual_hash) {
+                                if should_ignore_recent_image_echo(hash, || {
+                                    calc_image_hash_from_rgba(
+                                        image.width as u32,
+                                        image.height as u32,
+                                        &image.bytes,
+                                    )
+                                    .unwrap_or(hash as i64)
+                                        as u64
+                                }) {
                                     clear_recent_image_echo_state();
                                     handled = true;
                                 } else {
@@ -1064,8 +1091,138 @@ pub fn process_new_entry(
 
 #[cfg(test)]
 mod tests {
-    use super::{is_snipping_tool_source, should_capture_file_entries};
+    use super::{
+        clipboard_snapshot_hash, is_snipping_tool_source, should_capture_file_entries,
+        should_ignore_recent_image_echo,
+    };
     use crate::infrastructure::windows_api::window_tracker::ActiveAppInfo;
+    use std::hash::{Hash, Hasher};
+    use std::sync::atomic::Ordering;
+
+    fn sip(value: impl Hash) -> u64 {
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        value.hash(&mut hasher);
+        hasher.finish()
+    }
+
+    fn file_snapshot_hash(paths: &[&str]) -> u64 {
+        let paths = paths.iter().map(|path| path.to_string()).collect();
+        clipboard_snapshot_hash(None, || None, || None, || Some(paths))
+    }
+
+    #[test]
+    fn snapshot_hash_counts_text_and_any_image() {
+        let no_image = || -> Option<Vec<u8>> { None };
+        let untouched = || -> Option<Vec<u8>> { panic!("DIB should not be read") };
+        let no_files = || -> Option<Vec<String>> { panic!("file list should not be read") };
+        let hello = clipboard_snapshot_hash(Some("hello"), no_image, no_image, no_files);
+        // Same value the text-only clipboard always had.
+        assert_eq!(hello, sip("hello"));
+        assert_ne!(
+            clipboard_snapshot_hash(Some("world"), no_image, no_image, no_files),
+            hello
+        );
+        // The same caption over a different picture is a different copy.
+        let captioned =
+            clipboard_snapshot_hash(Some("hello"), || Some(vec![1, 2, 3]), untouched, no_files);
+        assert_ne!(captioned, hello);
+        assert_eq!(
+            clipboard_snapshot_hash(Some("hello"), || Some(vec![1, 2, 3]), untouched, no_files),
+            captioned
+        );
+        assert_ne!(
+            clipboard_snapshot_hash(Some("hello"), || Some(vec![1, 2, 4]), untouched, no_files),
+            captioned
+        );
+        assert_ne!(
+            clipboard_snapshot_hash(Some("hello"), no_image, || Some(vec![9u8; 16]), no_files),
+            hello
+        );
+    }
+
+    #[test]
+    fn snapshot_hash_falls_back_to_native_image_then_dib() {
+        let untouched = || -> Option<Vec<u8>> { panic!("DIB should not be read") };
+        let no_files = || -> Option<Vec<String>> { panic!("file list should not be read") };
+        let png = clipboard_snapshot_hash(None, || Some(vec![1, 2, 3]), untouched, no_files);
+        assert_eq!(png, sip(vec![1u8, 2, 3]));
+        assert_eq!(
+            clipboard_snapshot_hash(Some(" \n"), || Some(vec![1, 2, 3]), untouched, no_files),
+            png
+        );
+        assert_ne!(
+            clipboard_snapshot_hash(None, || Some(vec![1, 2, 4]), untouched, no_files),
+            png
+        );
+        // DIB-only clipboards keep the value the old pixel hash produced.
+        let pixels = vec![9u8; 16];
+        assert_eq!(
+            clipboard_snapshot_hash(None, || None, || Some(pixels.clone()), no_files),
+            sip(&pixels)
+        );
+        assert_eq!(
+            clipboard_snapshot_hash(None, || None, || None, || None),
+            std::collections::hash_map::DefaultHasher::new().finish()
+        );
+    }
+
+    #[test]
+    fn snapshot_hash_tells_copied_file_lists_apart() {
+        let pair = file_snapshot_hash(&[r"C:\docs\a.txt", r"C:\docs\b.txt"]);
+        assert_eq!(
+            file_snapshot_hash(&[r"C:\docs\a.txt", r"C:\docs\b.txt"]),
+            pair
+        );
+        assert_ne!(file_snapshot_hash(&[r"C:\docs\c.txt"]), pair);
+        assert_ne!(
+            pair,
+            std::collections::hash_map::DefaultHasher::new().finish()
+        );
+        // Copying a path as text and then the file itself are still two different copies.
+        let no_files = || -> Option<Vec<String>> { panic!("file list should not be read") };
+        assert_ne!(
+            file_snapshot_hash(&[r"C:\docs\c.txt"]),
+            clipboard_snapshot_hash(Some(r"C:\docs\c.txt"), || None, || None, no_files)
+        );
+    }
+
+    #[test]
+    fn recent_image_echo_matches_the_raw_then_visual_rule() {
+        let now_secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        // (set seconds ago, last hash, last alt hash, last visual hash, raw hash, visual hash, ignored)
+        let cases = [
+            (11, 7, 8, 9, 7, 9, false),
+            (1, 7, 8, 9, 7, 1, true),
+            (1, 7, 8, 9, 8, 1, true),
+            (1, 0, 8, 9, 8, 9, true),
+            (1, 7, 8, 9, 5, 9, true),
+            (1, 7, 8, 9, 5, 6, false),
+            (1, 7, 8, 0, 5, 0, false),
+            (1, 7, 8, 9, 5, 0, false),
+        ];
+        for (ago, last, alt, last_visual, raw, visual, expected) in cases {
+            crate::LAST_APP_SET_TIMESTAMP.store(now_secs - ago, Ordering::SeqCst);
+            crate::LAST_APP_SET_HASH.store(last, Ordering::SeqCst);
+            crate::LAST_APP_SET_HASH_ALT.store(alt, Ordering::SeqCst);
+            crate::LAST_APP_SET_IMAGE_VISUAL_HASH.store(last_visual, Ordering::SeqCst);
+            let mut visual_reads = 0;
+            let ignored = should_ignore_recent_image_echo(raw, || {
+                visual_reads += 1;
+                visual
+            });
+            let case = (ago, last, alt, last_visual, raw, visual);
+            assert_eq!(ignored, expected, "case {case:?}");
+            // The full decode is only worth it inside the window, after the raw hashes miss.
+            let raw_hit = last != 0 && (last == raw || alt == raw);
+            let needs_visual = ago < 10 && !raw_hit && last_visual != 0;
+            assert_eq!(visual_reads, needs_visual as i32, "case {case:?}");
+        }
+        super::clear_recent_image_echo_state();
+        crate::LAST_APP_SET_TIMESTAMP.store(0, Ordering::SeqCst);
+    }
 
     #[test]
     fn detects_snipping_tool_by_process_name() {

@@ -1068,6 +1068,33 @@ pub fn split_rich_html_and_named_formats(
     (html.to_string(), Vec::new())
 }
 
+/// Cuts the named formats marker out by position without decoding its payload.
+fn strip_rich_named_formats(html: &str) -> String {
+    // The marker is normally last and its base64 payload holds no '<' or '-', so
+    // single-byte searches find both ends far faster than substring searches; they
+    // fall back to those whenever the shape differs.
+    let start = html
+        .rfind('<')
+        .filter(|&idx| html[idx..].starts_with(RICH_NAMED_FORMATS_PREFIX))
+        .or_else(|| html.rfind(RICH_NAMED_FORMATS_PREFIX));
+    if let Some(start) = start {
+        let marker_start = start + RICH_NAMED_FORMATS_PREFIX.len();
+        let payload = &html[marker_start..];
+        let end_rel = payload
+            .find('-')
+            .filter(|&idx| payload[idx..].starts_with(RICH_NAMED_FORMATS_SUFFIX))
+            .or_else(|| payload.find(RICH_NAMED_FORMATS_SUFFIX));
+        if let Some(end_rel) = end_rel {
+            let marker_end = marker_start + end_rel + RICH_NAMED_FORMATS_SUFFIX.len();
+            let mut cleaned = String::with_capacity(start + html.len() - marker_end);
+            cleaned.push_str(&html[..start]);
+            cleaned.push_str(&html[marker_end..]);
+            return cleaned.trim().to_string();
+        }
+    }
+    html.to_string()
+}
+
 pub fn externalize_rich_image_fallback(html: &str, data_dir: &Path) -> String {
     let (clean_html, payload_opt) = split_rich_html_and_image_fallback(html);
     let Some(payload) = payload_opt else {
@@ -1114,12 +1141,13 @@ pub fn truncate_entry_for_ui(mut entry: ClipboardEntry) -> ClipboardEntry {
 }
 
 pub fn truncate_html_for_preview(html: &str) -> Option<String> {
-    let repaired = repair_html_fragment(html);
-    if repaired.trim().is_empty() {
+    if html.trim().is_empty() {
         return None;
     }
 
-    let (without_named_formats, named_formats) = split_rich_html_and_named_formats(&repaired);
+    // Named formats only matter for pasting, which reloads the full entry by id,
+    // so the preview cuts them off without decoding them.
+    let without_named_formats = repair_html_fragment(&strip_rich_named_formats(html));
     let (clean_html, image_fallback) = split_rich_html_and_image_fallback(&without_named_formats);
     let renderable_html = strip_office_preview_noise(&clean_html);
     let cleaned_repaired = repair_html_fragment(if renderable_html.trim().is_empty() {
@@ -1128,15 +1156,10 @@ pub fn truncate_html_for_preview(html: &str) -> Option<String> {
         &renderable_html
     });
     let reattach_preview_metadata = |html: String| {
-        let with_image = if let Some(payload) = image_fallback.as_deref() {
+        if let Some(payload) = image_fallback.as_deref() {
             attach_rich_image_fallback(&html, payload)
         } else {
             html
-        };
-        if named_formats.is_empty() {
-            with_image
-        } else {
-            attach_rich_named_formats(&with_image, &named_formats)
         }
     };
 
@@ -1225,7 +1248,8 @@ mod tests {
         infer_rich_html_from_plain_text, normalize_clipboard_plain_text,
         parse_app_cleanup_policies, parse_cf_html, parse_cleanup_rules,
         split_rich_html_and_image_fallback, split_rich_html_and_named_formats,
-        truncate_html_for_preview, AppCleanupPolicy, HTML_TRUNCATION_SUFFIX,
+        strip_rich_named_formats, truncate_html_for_preview, AppCleanupPolicy,
+        HTML_TRUNCATION_SUFFIX,
     };
     use base64::Engine;
     use std::fs;
@@ -1462,6 +1486,61 @@ mod tests {
             Some("data:image/png;base64,AAAA")
         );
         assert_eq!(cleaned, "<table><tr><td>Excel</td></tr></table>");
+    }
+
+    #[test]
+    fn html_preview_drops_named_formats_but_keeps_rich_image_fallback() {
+        let row = "<tr><td>Excel</td><td>Preview</td></tr>";
+        let html = format!("<table>{}</table>", row.repeat(300));
+        let html = attach_rich_image_fallback(&html, "data:image/png;base64,AAAA");
+        let formats = vec![
+            crate::infrastructure::windows_api::win_clipboard::NamedClipboardFormat {
+                name: "Biff12".to_string(),
+                data: vec![7; 4096],
+            },
+        ];
+        let tagged = attach_rich_named_formats(&html, &formats);
+
+        let truncated = truncate_html_for_preview(&tagged).expect("html preview should exist");
+        let (_, restored_formats) = split_rich_html_and_named_formats(&truncated);
+        let (cleaned, restored_image) = split_rich_html_and_image_fallback(&truncated);
+
+        assert!(!truncated.contains("TIEZ_RICH_FORMATS"));
+        assert!(restored_formats.is_empty());
+        assert_eq!(
+            restored_image.as_deref(),
+            Some("data:image/png;base64,AAAA")
+        );
+        assert!(cleaned.starts_with("<table"));
+        assert!(cleaned.contains("Excel"));
+    }
+
+    #[test]
+    fn strip_rich_named_formats_cuts_the_marker_without_decoding_it() {
+        let html = attach_rich_image_fallback(
+            "<table><tr><td>a-b</td></tr></table>",
+            "data:image/png;base64,AAAA",
+        );
+        let formats = vec![
+            crate::infrastructure::windows_api::win_clipboard::NamedClipboardFormat {
+                name: "Biff12".to_string(),
+                data: vec![7; 4096],
+            },
+        ];
+        let tagged = attach_rich_named_formats(&html, &formats);
+        let trailing = format!("{}\n<!-- trailing-comment --><p>x</p>", tagged);
+
+        for input in [html.clone(), tagged, trailing] {
+            let (expected, _) = split_rich_html_and_named_formats(&input);
+            assert_eq!(strip_rich_named_formats(&input), expected);
+        }
+
+        assert_eq!(
+            strip_rich_named_formats("<p>x</p>\n<!--TIEZ_RICH_FORMATS:not-base64-->"),
+            "<p>x</p>"
+        );
+        let unterminated = "<p>x</p>\n<!--TIEZ_RICH_FORMATS:abc";
+        assert_eq!(strip_rich_named_formats(unterminated), unterminated);
     }
 
     #[test]

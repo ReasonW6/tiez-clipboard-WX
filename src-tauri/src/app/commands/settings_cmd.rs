@@ -148,6 +148,7 @@ fn apply_runtime_setting(settings_state: &SettingsState, key: &str, mut value: S
             settings_state
                 .edge_docking
                 .store(value == "true", Ordering::Relaxed);
+            crate::app::setup::wake_edge_docking_monitor();
         }
         "app.follow_mouse" => {
             settings_state
@@ -220,7 +221,7 @@ pub fn set_window_pinned(app_handle: AppHandle, state: State<'_, DbState>, pinne
         .set("app.window_pinned", &pinned.to_string());
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_settings(
     state: State<'_, DbState>,
 ) -> AppResult<std::collections::HashMap<String, String>> {
@@ -490,6 +491,7 @@ pub fn set_edge_docking(
     enabled: bool,
 ) -> AppResult<()> {
     state.edge_docking.store(enabled, Ordering::Relaxed);
+    crate::app::setup::wake_edge_docking_monitor();
     let db_state = app_handle.state::<DbState>();
     db_state
         .settings_repo

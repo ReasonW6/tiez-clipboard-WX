@@ -25,6 +25,8 @@ pub static IGNORE_BLUR: AtomicBool = AtomicBool::new(false);
 pub static WINDOW_PINNED: AtomicBool = AtomicBool::new(false);
 pub static CLIPBOARD_MONITOR_PAUSED: AtomicBool = AtomicBool::new(false);
 pub static LAST_ACTIVE_HWND: AtomicUsize = AtomicUsize::new(0);
+// Read by the hook and docking threads, which must not wait on the main thread for it.
+pub static MAIN_HWND: AtomicUsize = AtomicUsize::new(0);
 pub static LAST_APP_SET_HASH: AtomicU64 = AtomicU64::new(0);
 pub static LAST_APP_SET_HASH_ALT: AtomicU64 = AtomicU64::new(0);
 pub static LAST_APP_SET_IMAGE_VISUAL_HASH: AtomicU64 = AtomicU64::new(0);
