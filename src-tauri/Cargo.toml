@@ -42,7 +42,6 @@ tokio = { version = "1", features = ["time"] }
 tauri-plugin-dialog = "2.6"
 tauri-plugin-global-shortcut = "2.3.1"
 window-vibrancy = "0.7.1"
-rayon = "1.10"
 
 regex = "1.12.2"
 tauri-plugin-single-instance = "2"
@@ -72,3 +71,14 @@ opt-level = "s"
 strip = true
 # 启用 panic = abort 减少 unwinding 代码
 panic = "abort"
+
+[profile.release.package.png]
+opt-level = 3
+[profile.release.package.fdeflate]
+opt-level = 3
+[profile.release.package.miniz_oxide]
+opt-level = 3
+[profile.release.package.image]
+opt-level = 3
+[profile.release.package.base64]
+opt-level = 3

@@ -1,6 +1,6 @@
 use crate::database::{
-    calc_image_hash, calc_text_hash, has_sensitive_tag, is_text_type, save_image_to_file,
-    ENCRYPT_PREFIX,
+    calc_image_hash, calc_text_hash, has_sensitive_tag, is_text_type, normalize_text,
+    save_image_to_file, ENCRYPT_PREFIX,
 };
 use crate::domain::models::ClipboardEntry;
 use crate::infrastructure::encryption;
@@ -14,6 +14,9 @@ use urlencoding::decode;
 
 const RICH_IMAGE_FALLBACK_PREFIX: &str = "<!--TIEZ_RICH_IMAGE:";
 const RICH_IMAGE_FALLBACK_SUFFIX: &str = "-->";
+const FIND_TYPED_BY_HASH_SQL: &str = "SELECT id, content_hash FROM clipboard_history \
+     WHERE content_type = ?1 AND content_hash IN (?2, 0) AND (content_hash = ?2 OR content = ?3) \
+     ORDER BY id";
 
 pub trait ClipboardRepository {
     fn save(
@@ -259,6 +262,7 @@ impl SqliteClipboardRepository {
         conn: &Connection,
         entry: &mut ClipboardEntry,
         data_dir: Option<&std::path::Path>,
+        image_hash: Option<i64>,
     ) -> Result<i64, String> {
         let transaction = conn.unchecked_transaction().map_err(|e| e.to_string())?;
         if entry.id > 0 {
@@ -266,7 +270,7 @@ impl SqliteClipboardRepository {
                 .ok_or_else(|| "Clipboard entry no longer exists".to_string())?;
             entry.preserve_capture_metadata(&existing);
         }
-        let id = self.save_with_conn(&transaction, entry, data_dir)?;
+        let id = self.save_with_conn(&transaction, entry, data_dir, image_hash)?;
         let saved = self.get_entry_by_id_with_conn(&transaction, id)?
             .ok_or_else(|| "Saved clipboard entry is missing".to_string())?;
         transaction.commit().map_err(|e| e.to_string())?;
@@ -274,11 +278,14 @@ impl SqliteClipboardRepository {
         Ok(id)
     }
 
+    /// `image_hash` is an image entry's visual hash when the caller already has it (the capture
+    /// pipeline does), so the save does not decode the image again under the DB lock.
     pub fn save_with_conn(
         &self,
         conn: &Connection,
         entry: &ClipboardEntry,
         data_dir: Option<&std::path::Path>,
+        image_hash: Option<i64>,
     ) -> Result<i64, String> {
         // Encrypt only when explicitly marked as sensitive
         let should_encrypt = has_sensitive_tag(&entry.tags);
@@ -297,7 +304,9 @@ impl SqliteClipboardRepository {
         }
 
         let calculated_hash = if entry.content_type == "image" {
-            if entry.content.starts_with("data:") {
+            if let Some(hash) = image_hash {
+                hash
+            } else if entry.content.starts_with("data:") {
                 calc_image_hash(&entry.content).unwrap_or(0)
             } else {
                 if let Ok(img) = image::open(&entry.content) {
@@ -460,45 +469,26 @@ impl SqliteClipboardRepository {
         Ok(())
     }
 
+    /// `image_hash` is the visual hash of an image `content` when the caller already has it.
     pub fn find_by_content_with_conn(
         &self,
         conn: &Connection,
         content: &str,
         content_type: Option<&str>,
+        image_hash: Option<i64>,
     ) -> Result<Option<i64>, String> {
         if content_type == Some("image") {
-            if let Some(hash) = calc_image_hash(content) {
-                let mut stmt = conn
-                    .prepare(
-                        "SELECT id FROM clipboard_history \
-                     WHERE (content_type = 'image' AND content_hash = ?) OR content = ?",
-                    )
-                    .map_err(|e| e.to_string())?;
-                let mut rows = stmt
-                    .query(params![hash, content])
-                    .map_err(|e| e.to_string())?;
-                if let Some(row) = rows.next().map_err(|e| e.to_string())? {
-                    return Ok(Some(row.get(0).map_err(|e| e.to_string())?));
-                }
-                return Ok(None);
+            if let Some(hash) = image_hash.or_else(|| calc_image_hash(content)) {
+                // The visual hash is meant to match the same picture in another encoding or
+                // saved as a file, so a hash hit is not compared with the content.
+                return self.find_typed_with_conn(conn, "image", hash, content, false);
             }
         }
 
         let hash = calc_text_hash(content) as i64;
 
         if let Some(ct) = content_type {
-            let mut stmt = conn.prepare(
-                "SELECT id FROM clipboard_history \
-                 WHERE (content_type = ? AND content_hash = ?) OR (content_type = ? AND content = ?)",
-            ).map_err(|e| e.to_string())?;
-            let mut rows = stmt
-                .query(params![ct, hash, ct, content])
-                .map_err(|e| e.to_string())?;
-            if let Some(row) = rows.next().map_err(|e| e.to_string())? {
-                Ok(Some(row.get(0).map_err(|e| e.to_string())?))
-            } else {
-                Ok(None)
-            }
+            self.find_typed_with_conn(conn, ct, hash, content, true)
         } else {
             let mut stmt = conn.prepare(
                 "SELECT id FROM clipboard_history \
@@ -513,6 +503,41 @@ impl SqliteClipboardRepository {
                 Ok(None)
             }
         }
+    }
+
+    /// Oldest row of `content_type` whose hash matches. Matching on `content` is kept only for
+    /// rows whose hash was never filled in (0), so the lookup stays on
+    /// idx_clipboard_history_type_hash instead of scanning the table. Text hits are checked
+    /// against the content in case two texts share a hash.
+    fn find_typed_with_conn(
+        &self,
+        conn: &Connection,
+        content_type: &str,
+        hash: i64,
+        content: &str,
+        verify_text: bool,
+    ) -> Result<Option<i64>, String> {
+        let mut stmt = conn.prepare(FIND_TYPED_BY_HASH_SQL).map_err(|e| e.to_string())?;
+        let mut rows = stmt
+            .query(params![content_type, hash, content])
+            .map_err(|e| e.to_string())?;
+        let normalized = verify_text.then(|| normalize_text(content));
+        while let Some(row) = rows.next().map_err(|e| e.to_string())? {
+            let id: i64 = row.get(0).map_err(|e| e.to_string())?;
+            let row_hash: i64 = row.get(1).map_err(|e| e.to_string())?;
+            // Image hits stand on the visual hash; a 0-hash row has already matched on content.
+            if !verify_text || row_hash != hash {
+                return Ok(Some(id));
+            }
+            if let Some((stored, _)) = self.get_entry_content_full_with_conn(conn, id)? {
+                // A row we cannot decrypt keeps the old hash-only match.
+                if stored.starts_with(ENCRYPT_PREFIX) || normalized == Some(normalize_text(&stored))
+                {
+                    return Ok(Some(id));
+                }
+            }
+        }
+        Ok(None)
     }
 
     pub fn enforce_limit_with_conn(
@@ -774,7 +799,7 @@ impl ClipboardRepository for SqliteClipboardRepository {
         data_dir: Option<&std::path::Path>,
     ) -> Result<i64, String> {
         let conn = self.conn.lock().map_err(|e| e.to_string())?;
-        self.save_with_conn(&conn, entry, data_dir)
+        self.save_with_conn(&conn, entry, data_dir, None)
     }
 
     fn get_history(
@@ -1228,7 +1253,7 @@ impl ClipboardRepository for SqliteClipboardRepository {
         content_type: Option<&str>,
     ) -> Result<Option<i64>, String> {
         let conn = self.conn.lock().map_err(|e| e.to_string())?;
-        self.find_by_content_with_conn(&conn, content, content_type)
+        self.find_by_content_with_conn(&conn, content, content_type, None)
     }
 
     fn update_entry_content(&self, id: i64, content: &str, preview: &str) -> Result<(), String> {
@@ -1261,5 +1286,148 @@ impl ClipboardRepository for SqliteClipboardRepository {
     ) -> Result<Option<(String, String, Option<String>)>, String> {
         let conn = self.conn.lock().map_err(|e| e.to_string())?;
         self.get_entry_content_with_html_with_conn(&conn, id)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use image::codecs::png::{CompressionType, FilterType, PngEncoder};
+
+    fn repo_with_schema() -> (SqliteClipboardRepository, Arc<Mutex<Connection>>) {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::infrastructure::repository::migrations::run_migrations(&conn).unwrap();
+        let conn = Arc::new(Mutex::new(conn));
+        (SqliteClipboardRepository::new(conn.clone()), conn)
+    }
+
+    fn entry(content_type: &str, content: &str, tags: &[&str]) -> ClipboardEntry {
+        ClipboardEntry {
+            id: 0, content_type: content_type.into(), content: content.into(),
+            html_content: None, source_app: "Test".into(), source_app_path: None,
+            timestamp: 1, preview: "preview".into(), is_pinned: false,
+            tags: tags.iter().map(|t| t.to_string()).collect(), use_count: 0,
+            is_external: false, pinned_order: 0, file_preview_exists: true,
+        }
+    }
+
+    fn insert_raw(conn: &Connection, content_type: &str, content: &str, hash: i64) -> i64 {
+        conn.execute(
+            "INSERT INTO clipboard_history (content_type, content, source_app, timestamp, preview, content_hash)
+             VALUES (?1, ?2, 'Legacy', 1, 'preview', ?3)",
+            params![content_type, content, hash],
+        ).unwrap();
+        conn.last_insert_rowid()
+    }
+
+    /// Same pixels, different PNG bytes, so only the visual hash can tell they match.
+    fn png_data_url(seed: u8, compression: CompressionType) -> String {
+        use base64::Engine;
+        use image::ImageEncoder;
+        let pixels: Vec<u8> = (0..64u32 * 48 * 4).map(|i| (i as u8).wrapping_mul(seed)).collect();
+        let mut png = Vec::new();
+        PngEncoder::new_with_quality(&mut png, compression, FilterType::Adaptive)
+            .write_image(&pixels, 64, 48, image::ExtendedColorType::Rgba8)
+            .unwrap();
+        format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(png))
+    }
+
+    #[test]
+    fn text_lookup_matches_hash_within_type_and_legacy_rows_by_content() {
+        let (repo, conn) = repo_with_schema();
+        let id = repo.save(&entry("text", "hello world", &[]), None).unwrap();
+        let rich_id = repo.save(&entry("rich_text", "rich words", &[]), None).unwrap();
+        let conn = conn.lock().unwrap();
+        let legacy_id = insert_raw(&conn, "text", "legacy note", 0);
+
+        assert_eq!(repo.find_by_content_with_conn(&conn, "hello world", Some("text"), None).unwrap(), Some(id));
+        assert_eq!(repo.find_by_content_with_conn(&conn, " hello world\r\n", Some("text"), None).unwrap(), Some(id));
+        assert_eq!(repo.find_by_content_with_conn(&conn, "hello world", Some("code"), None).unwrap(), None);
+        assert_eq!(repo.find_by_content_with_conn(&conn, "rich words", Some("rich_text"), None).unwrap(), Some(rich_id));
+        assert_eq!(repo.find_by_content_with_conn(&conn, "legacy note", Some("text"), None).unwrap(), Some(legacy_id));
+        assert_eq!(repo.find_by_content_with_conn(&conn, "legacy", Some("text"), None).unwrap(), None);
+    }
+
+    #[test]
+    fn text_lookup_finds_encrypted_rows_and_prefers_the_oldest_duplicate() {
+        let (repo, conn) = repo_with_schema();
+        let secret_id = repo.save(&entry("text", "secret 123", &["sensitive"]), None).unwrap();
+        let first = repo.save(&entry("text", "twice", &[]), None).unwrap();
+        repo.save(&entry("text", "twice", &[]), None).unwrap();
+        let conn = conn.lock().unwrap();
+        assert_eq!(repo.find_by_content_with_conn(&conn, "secret 123", Some("text"), None).unwrap(), Some(secret_id));
+        assert_eq!(repo.find_by_content_with_conn(&conn, "twice", Some("text"), None).unwrap(), Some(first));
+    }
+
+    #[test]
+    fn image_lookup_matches_the_same_pixels_across_encodings_and_storage() {
+        let (repo, conn) = repo_with_schema();
+        let dir = std::env::temp_dir().join(format!("tiez-image-lookup-{}", uuid::Uuid::new_v4()));
+        let stored = png_data_url(3, CompressionType::Fast);
+        let recopied = png_data_url(3, CompressionType::Best);
+        assert_ne!(stored, recopied);
+        let id = repo.save(&entry("image", &stored, &[]), Some(&dir)).unwrap();
+        let conn = conn.lock().unwrap();
+        let saved: (String, i64) = conn.query_row(
+            "SELECT content, content_hash FROM clipboard_history WHERE id = ?", [id], |r| Ok((r.get(0)?, r.get(1)?)),
+        ).unwrap();
+        assert!(saved.0.starts_with(&dir.to_string_lossy().to_string()), "image should be externalized");
+        assert_eq!(Some(saved.1), calc_image_hash(&stored));
+
+        assert_eq!(repo.find_by_content_with_conn(&conn, &recopied, Some("image"), None).unwrap(), Some(id));
+        assert_eq!(
+            repo.find_by_content_with_conn(&conn, &recopied, Some("image"), calc_image_hash(&recopied)).unwrap(),
+            Some(id)
+        );
+        assert_eq!(repo.find_by_content_with_conn(&conn, &png_data_url(5, CompressionType::Fast), Some("image"), None).unwrap(), None);
+        let legacy_url = png_data_url(7, CompressionType::Fast);
+        let legacy_id = insert_raw(&conn, "image", &legacy_url, 0);
+        assert_eq!(repo.find_by_content_with_conn(&conn, &legacy_url, Some("image"), None).unwrap(), Some(legacy_id));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn text_lookup_rejects_a_hash_collision() {
+        let (repo, conn) = repo_with_schema();
+        let conn = conn.lock().unwrap();
+        insert_raw(&conn, "text", "alpha", calc_text_hash("beta") as i64);
+        assert_eq!(repo.find_by_content_with_conn(&conn, "beta", Some("text"), None).unwrap(), None);
+    }
+
+    #[test]
+    fn typed_lookup_searches_the_type_hash_index() {
+        let (_, conn) = repo_with_schema();
+        let conn = conn.lock().unwrap();
+        let mut stmt = conn.prepare(&format!("EXPLAIN QUERY PLAN {FIND_TYPED_BY_HASH_SQL}")).unwrap();
+        let plan: Vec<String> = stmt
+            .query_map(params!["text", 1i64, "x"], |row| row.get(3))
+            .unwrap()
+            .map(|row| row.unwrap())
+            .collect();
+        let plan = plan.join(" | ");
+        assert!(plan.contains("USING INDEX idx_clipboard_history_type_hash"), "{plan}");
+        assert!(!plan.contains("SCAN clipboard_history"), "{plan}");
+    }
+
+    #[test]
+    fn saving_a_written_image_with_its_known_hash_matches_a_plain_save() {
+        let (repo, conn) = repo_with_schema();
+        let dir = std::env::temp_dir().join(format!("tiez-known-hash-{}", uuid::Uuid::new_v4()));
+        let url = png_data_url(9, CompressionType::Fast);
+        let plain = repo.save(&entry("image", &url, &[]), Some(&dir)).unwrap();
+        // What the capture pipeline now does: write the file and hash outside the DB lock.
+        let mut written = entry("image", &save_image_to_file(&url, &dir).unwrap(), &[]);
+        written.is_external = true;
+        let conn = conn.lock().unwrap();
+        let piped = repo.save_with_conn(&conn, &written, Some(&dir), calc_image_hash(&url)).unwrap();
+        let row = |id: i64| -> (String, i64, i64) {
+            conn.query_row(
+                "SELECT content, content_hash, is_external FROM clipboard_history WHERE id = ?",
+                [id],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            ).unwrap()
+        };
+        assert_eq!(row(plain), row(piped));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

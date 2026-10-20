@@ -48,7 +48,7 @@ pub fn toggle_clipboard_pin(
 
     if let Some(entry) = entry_to_save {
         let data_dir = app_data_dir.0.lock().unwrap().clone();
-        if let Ok(new_id) = state.repo.save_with_conn(&conn, &entry, Some(&data_dir)) {
+        if let Ok(new_id) = state.repo.save_with_conn(&conn, &entry, Some(&data_dir), None) {
             real_id = new_id;
             if let Ok(deleted_ids) = state.repo.enforce_limit_with_conn(&conn, Some(&data_dir)) {
                 for deleted_id in deleted_ids {
