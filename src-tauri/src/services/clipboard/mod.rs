@@ -47,11 +47,13 @@ fn should_ignore_recent_image_echo(raw_hash: u64, visual_hash: impl FnOnce() -> 
 }
 
 /// Hash for the short same-content window. Text decides when there is any; otherwise the
-/// image does, through the source's own PNG/JPEG bytes before the far larger DIB pixels.
+/// image does, through the source's own PNG/JPEG bytes before the far larger DIB pixels;
+/// a copied file list (CF_HDROP) comes last.
 fn clipboard_snapshot_hash(
     text: Option<&str>,
     native_image: impl FnOnce() -> Option<Vec<u8>>,
     dib_pixels: impl FnOnce() -> Option<Vec<u8>>,
+    file_paths: impl FnOnce() -> Option<Vec<String>>,
 ) -> u64 {
     use std::hash::{Hash, Hasher};
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
@@ -59,6 +61,8 @@ fn clipboard_snapshot_hash(
         text.hash(&mut hasher);
     } else if let Some(bytes) = native_image().or_else(dib_pixels) {
         bytes.hash(&mut hasher);
+    } else if let Some(paths) = file_paths() {
+        paths.hash(&mut hasher);
     }
     hasher.finish()
 }
@@ -574,6 +578,7 @@ pub fn start_clipboard_monitor(app_handle: AppHandle) {
                 .as_deref(),
             || unsafe { read_native_clipboard_image() },
             || read_clipboard_image_once(&mut cached_image).map(|image| image.bytes),
+            || unsafe { crate::infrastructure::windows_api::win_clipboard::get_clipboard_files() },
         );
 
         // If content is identical to last processed content within 2000ms window, skip.
@@ -1096,28 +1101,67 @@ mod tests {
         hasher.finish()
     }
 
+    fn file_snapshot_hash(paths: &[&str]) -> u64 {
+        let paths = paths.iter().map(|path| path.to_string()).collect();
+        clipboard_snapshot_hash(None, || None, || None, || Some(paths))
+    }
+
     #[test]
     fn snapshot_hash_uses_text_alone_when_there_is_text() {
         let untouched = || -> Option<Vec<u8>> { panic!("image formats should not be read") };
-        let hello = clipboard_snapshot_hash(Some("hello"), untouched, untouched);
+        let no_files = || -> Option<Vec<String>> { panic!("file list should not be read") };
+        let hello = clipboard_snapshot_hash(Some("hello"), untouched, untouched, no_files);
         // Same value the text-only clipboard always had.
         assert_eq!(hello, sip("hello"));
-        assert_ne!(clipboard_snapshot_hash(Some("world"), untouched, untouched), hello);
+        assert_ne!(
+            clipboard_snapshot_hash(Some("world"), untouched, untouched, no_files),
+            hello
+        );
     }
 
     #[test]
     fn snapshot_hash_falls_back_to_native_image_then_dib() {
         let untouched = || -> Option<Vec<u8>> { panic!("DIB should not be read") };
-        let png = clipboard_snapshot_hash(None, || Some(vec![1, 2, 3]), untouched);
+        let no_files = || -> Option<Vec<String>> { panic!("file list should not be read") };
+        let png = clipboard_snapshot_hash(None, || Some(vec![1, 2, 3]), untouched, no_files);
         assert_eq!(png, sip(vec![1u8, 2, 3]));
-        assert_eq!(clipboard_snapshot_hash(Some(" \n"), || Some(vec![1, 2, 3]), untouched), png);
-        assert_ne!(clipboard_snapshot_hash(None, || Some(vec![1, 2, 4]), untouched), png);
+        assert_eq!(
+            clipboard_snapshot_hash(Some(" \n"), || Some(vec![1, 2, 3]), untouched, no_files),
+            png
+        );
+        assert_ne!(
+            clipboard_snapshot_hash(None, || Some(vec![1, 2, 4]), untouched, no_files),
+            png
+        );
         // DIB-only clipboards keep the value the old pixel hash produced.
         let pixels = vec![9u8; 16];
-        assert_eq!(clipboard_snapshot_hash(None, || None, || Some(pixels.clone())), sip(&pixels));
         assert_eq!(
-            clipboard_snapshot_hash(None, || None, || None),
+            clipboard_snapshot_hash(None, || None, || Some(pixels.clone()), no_files),
+            sip(&pixels)
+        );
+        assert_eq!(
+            clipboard_snapshot_hash(None, || None, || None, || None),
             std::collections::hash_map::DefaultHasher::new().finish()
+        );
+    }
+
+    #[test]
+    fn snapshot_hash_tells_copied_file_lists_apart() {
+        let pair = file_snapshot_hash(&[r"C:\docs\a.txt", r"C:\docs\b.txt"]);
+        assert_eq!(
+            file_snapshot_hash(&[r"C:\docs\a.txt", r"C:\docs\b.txt"]),
+            pair
+        );
+        assert_ne!(file_snapshot_hash(&[r"C:\docs\c.txt"]), pair);
+        assert_ne!(
+            pair,
+            std::collections::hash_map::DefaultHasher::new().finish()
+        );
+        // Copying a path as text and then the file itself are still two different copies.
+        let no_files = || -> Option<Vec<String>> { panic!("file list should not be read") };
+        assert_ne!(
+            file_snapshot_hash(&[r"C:\docs\c.txt"]),
+            clipboard_snapshot_hash(Some(r"C:\docs\c.txt"), || None, || None, no_files)
         );
     }
 
