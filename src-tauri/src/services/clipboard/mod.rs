@@ -612,6 +612,10 @@ pub fn start_clipboard_monitor(app_handle: AppHandle) {
             {
                 let content = files.join("\n");
                 if !content.is_empty() {
+                    let capture_files_enabled = should_capture_file_entries(
+                        app.state::<SettingsState>().capture_files.load(Ordering::Relaxed),
+                    );
+                    let mut own_echo = false;
                     let is_new = content != monitor_state.last_text;
                     let mut should_process = is_new;
                     if !is_new {
@@ -648,27 +652,26 @@ pub fn start_clipboard_monitor(app_handle: AppHandle) {
                         {
                             crate::LAST_APP_SET_HASH.store(0, Ordering::SeqCst);
                             crate::LAST_APP_SET_HASH_ALT.store(0, Ordering::SeqCst);
+                            own_echo = true;
                         } else {
                             crate::LAST_APP_SET_HASH.store(0, Ordering::SeqCst);
                             crate::LAST_APP_SET_HASH_ALT.store(0, Ordering::SeqCst);
                             monitor_state.last_text = content.clone();
 
-                            let settings = app.state::<SettingsState>();
-                            if should_capture_file_entries(
-                                settings.capture_files.load(Ordering::Relaxed),
-                            ) {
+                            if capture_files_enabled {
                                 process_new_entry(
                                     &app,
                                     ClipboardData::Files(files),
                                     None,
                                     Some(source_snapshot.clone()),
                                 );
-                            } else {
-                                file_list_skipped = true;
                             }
                         }
                     }
-                    handled = !file_list_skipped;
+                    // Decided by the setting alone: a file list already seen or stored must
+                    // not hide the image next to it. TieZ's own paste stays handled.
+                    handled = capture_files_enabled || own_echo;
+                    file_list_skipped = !handled;
                 }
             }
         }
