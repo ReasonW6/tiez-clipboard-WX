@@ -599,6 +599,9 @@ pub fn start_clipboard_monitor(app_handle: AppHandle) {
         monitor_state.last_process_time = now;
 
         let mut handled = false;
+        // Screenshot tools such as PixPin put a temp file next to the bitmap. With file
+        // capture off, that file list is skipped but the image is still captured.
+        let mut file_list_skipped = false;
 
         // --- Core processing logic (same as before) ---
 
@@ -609,6 +612,10 @@ pub fn start_clipboard_monitor(app_handle: AppHandle) {
             {
                 let content = files.join("\n");
                 if !content.is_empty() {
+                    let capture_files_enabled = should_capture_file_entries(
+                        app.state::<SettingsState>().capture_files.load(Ordering::Relaxed),
+                    );
+                    let mut own_echo = false;
                     let is_new = content != monitor_state.last_text;
                     let mut should_process = is_new;
                     if !is_new {
@@ -645,15 +652,13 @@ pub fn start_clipboard_monitor(app_handle: AppHandle) {
                         {
                             crate::LAST_APP_SET_HASH.store(0, Ordering::SeqCst);
                             crate::LAST_APP_SET_HASH_ALT.store(0, Ordering::SeqCst);
+                            own_echo = true;
                         } else {
                             crate::LAST_APP_SET_HASH.store(0, Ordering::SeqCst);
                             crate::LAST_APP_SET_HASH_ALT.store(0, Ordering::SeqCst);
                             monitor_state.last_text = content.clone();
 
-                            let settings = app.state::<SettingsState>();
-                            if should_capture_file_entries(
-                                settings.capture_files.load(Ordering::Relaxed),
-                            ) {
+                            if capture_files_enabled {
                                 process_new_entry(
                                     &app,
                                     ClipboardData::Files(files),
@@ -663,12 +668,15 @@ pub fn start_clipboard_monitor(app_handle: AppHandle) {
                             }
                         }
                     }
-                    handled = true;
+                    // Decided by the setting alone: a file list already seen or stored must
+                    // not hide the image next to it. TieZ's own paste stays handled.
+                    handled = capture_files_enabled || own_echo;
+                    file_list_skipped = !handled;
                 }
             }
         }
 
-        if !handled {
+        if !handled && !file_list_skipped {
             let settings = app.state::<SettingsState>();
             let rich_text_enabled = settings.capture_rich_text.load(Ordering::Relaxed);
             let initial_text = read_clipboard_text_once(&mut clipboard, &mut cached_text)
@@ -1013,7 +1021,7 @@ pub fn start_clipboard_monitor(app_handle: AppHandle) {
         }
 
         // 4. Check Text
-        if !handled {
+        if !handled && !file_list_skipped {
             if let Some(text) = read_clipboard_text_once(&mut clipboard, &mut cached_text) {
                 let normalized_text = normalize_clipboard_plain_text(&text);
                 if !normalized_text.trim().is_empty() {
