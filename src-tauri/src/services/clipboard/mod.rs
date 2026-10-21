@@ -599,6 +599,9 @@ pub fn start_clipboard_monitor(app_handle: AppHandle) {
         monitor_state.last_process_time = now;
 
         let mut handled = false;
+        // Screenshot tools such as PixPin put a temp file next to the bitmap. With file
+        // capture off, that file list is skipped but the image is still captured.
+        let mut file_list_skipped = false;
 
         // --- Core processing logic (same as before) ---
 
@@ -660,15 +663,17 @@ pub fn start_clipboard_monitor(app_handle: AppHandle) {
                                     None,
                                     Some(source_snapshot.clone()),
                                 );
+                            } else {
+                                file_list_skipped = true;
                             }
                         }
                     }
-                    handled = true;
+                    handled = !file_list_skipped;
                 }
             }
         }
 
-        if !handled {
+        if !handled && !file_list_skipped {
             let settings = app.state::<SettingsState>();
             let rich_text_enabled = settings.capture_rich_text.load(Ordering::Relaxed);
             let initial_text = read_clipboard_text_once(&mut clipboard, &mut cached_text)
@@ -1013,7 +1018,7 @@ pub fn start_clipboard_monitor(app_handle: AppHandle) {
         }
 
         // 4. Check Text
-        if !handled {
+        if !handled && !file_list_skipped {
             if let Some(text) = read_clipboard_text_once(&mut clipboard, &mut cached_text) {
                 let normalized_text = normalize_clipboard_plain_text(&text);
                 if !normalized_text.trim().is_empty() {
